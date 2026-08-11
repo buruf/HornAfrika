@@ -1,0 +1,441 @@
+// HORNAFRIKA — regional news & information platform
+// SQLite for local development. Switching to Postgres is a datasource change:
+// no model in this file depends on a SQLite-specific feature.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // Postgres in production. For offline local work, change this one line to
+  // "sqlite", point DATABASE_URL at file:./dev.db and run `npm run db:reset`.
+  // No model in this file uses a provider-specific feature, so the switch is
+  // genuinely just this line.
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Geography
+// ---------------------------------------------------------------------------
+
+model Country {
+  id         String  @id @default(cuid())
+  slug       String  @unique
+  name       String
+  nativeName String?
+  flag       String // emoji flag, used in nav and country blocks
+  blurb      String // one-paragraph description on the country page
+  capital    String
+  accent     String // hex, used sparingly for the country rule
+  order      Int     @default(0)
+
+  regions          Region[]
+  articles         Article[]        @relation("PrimaryCountry")
+  articleCountries ArticleCountry[]
+  videos           Video[]
+  sources          Source[]
+  wireItems        WireItemCountry[]
+
+  @@index([order])
+}
+
+// Regions are additive: a new Ethiopian region is a row, not a migration.
+model Region {
+  id        String  @id @default(cuid())
+  slug      String
+  name      String
+  blurb     String?
+  countryId String
+  order     Int     @default(0)
+
+  country  Country   @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  articles Article[]
+
+  @@unique([countryId, slug])
+  @@index([countryId, order])
+}
+
+// ---------------------------------------------------------------------------
+// Taxonomy
+// ---------------------------------------------------------------------------
+
+// kind distinguishes an editorial desk (Politics) from a format (Explained,
+// People, Video) so navigation and layout can treat them differently.
+enum CategoryKind {
+  DESK
+  FORMAT
+  REGIONAL
+}
+
+model Category {
+  id       String       @id @default(cuid())
+  slug     String       @unique
+  name     String
+  kind     CategoryKind @default(DESK)
+  color    String // chip colour token name
+  blurb    String?
+  inNav    Boolean      @default(true)
+  order    Int          @default(0)
+
+  subcategories Subcategory[]
+  articles      Article[]
+
+  @@index([order])
+}
+
+model Subcategory {
+  id         String @id @default(cuid())
+  slug       String
+  name       String
+  categoryId String
+  order      Int    @default(0)
+
+  category Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  articles Article[]
+
+  @@unique([categoryId, slug])
+}
+
+model Topic {
+  id   String @id @default(cuid())
+  slug String @unique
+  name String
+
+  articles ArticleTopic[]
+}
+
+// ---------------------------------------------------------------------------
+// People
+// ---------------------------------------------------------------------------
+
+model Author {
+  id         String  @id @default(cuid())
+  slug       String  @unique
+  name       String
+  title      String
+  bio        String
+  avatarSeed String
+  location   String?
+
+  articles Article[]
+  user     User?
+}
+
+enum Role {
+  SUPER_ADMIN
+  EDITOR
+  JOURNALIST
+  CONTRIBUTOR
+  MODERATOR
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role     @default(CONTRIBUTOR)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  authorId String? @unique
+  author   Author? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  editorialLogs EditorialLog[]
+}
+
+// ---------------------------------------------------------------------------
+// Articles
+// ---------------------------------------------------------------------------
+
+enum ArticleStatus {
+  DRAFT
+  REVIEW
+  APPROVED
+  PUBLISHED
+  UPDATED
+  ARCHIVED
+}
+
+// Homepage placement is set by an editor, never by an algorithm (spec §20).
+enum Placement {
+  NONE
+  LEAD
+  SECONDARY
+  COUNTRY_LEAD
+  SECTION_FEATURE
+}
+
+model Article {
+  id       String @id @default(cuid())
+  slug     String @unique
+  headline String
+  deck     String // short summary / standfirst
+  body     String // paragraphs separated by a blank line
+
+  countryId     String?
+  regionId      String?
+  categoryId    String
+  subcategoryId String?
+  authorId      String
+
+  status      ArticleStatus @default(DRAFT)
+  placement   Placement     @default(NONE)
+  isBreaking  Boolean       @default(false)
+  isDeveloping Boolean      @default(false)
+  isSeed      Boolean       @default(false) // scaffolding, not reporting
+
+  imageSeed    String
+  imageUrl     String? // real photography once licensed; overrides the SVG
+  imageCaption String
+  imageCredit  String?
+  sourceNote   String? // "Source:" line where a claim needs attribution
+
+  seoTitle       String?
+  seoDescription String?
+  canonicalUrl   String?
+
+  readMinutes Int      @default(3)
+  publishedAt DateTime?
+  revisedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  country     Country?     @relation("PrimaryCountry", fields: [countryId], references: [id], onDelete: SetNull)
+  region      Region?      @relation(fields: [regionId], references: [id], onDelete: SetNull)
+  category    Category     @relation(fields: [categoryId], references: [id])
+  subcategory Subcategory? @relation(fields: [subcategoryId], references: [id], onDelete: SetNull)
+  author      Author       @relation(fields: [authorId], references: [id])
+
+  countries    ArticleCountry[]
+  topics       ArticleTopic[]
+  views        ArticleView[]
+  editorialLog EditorialLog[]
+  homepageSlot HomepageSlot[]
+
+  @@index([status, publishedAt])
+  @@index([countryId, status, publishedAt])
+  @@index([categoryId, status, publishedAt])
+  @@index([placement, status])
+}
+
+// A story about Ethiopia–Somalia relations is first-class on both country
+// pages and in /horn, without being duplicated. This join table is what makes
+// the regional section structurally real rather than a tag.
+model ArticleCountry {
+  articleId String
+  countryId String
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  country Country @relation(fields: [countryId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, countryId])
+  @@index([countryId])
+}
+
+model ArticleTopic {
+  articleId String
+  topicId   String
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  topic   Topic   @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, topicId])
+  @@index([topicId])
+}
+
+// Raw view events. Trending aggregates these with a recency weight rather
+// than sorting by publication date (spec §19).
+model ArticleView {
+  id        String   @id @default(cuid())
+  articleId String
+  viewedAt  DateTime @default(now())
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([viewedAt])
+  @@index([articleId, viewedAt])
+}
+
+model EditorialLog {
+  id         String        @id @default(cuid())
+  articleId  String
+  userId     String?
+  fromStatus ArticleStatus?
+  toStatus   ArticleStatus
+  note       String?
+  createdAt  DateTime      @default(now())
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([articleId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Video
+// ---------------------------------------------------------------------------
+
+enum VideoKind {
+  NEWS
+  INTERVIEW
+  EXPLAINER
+  DOCUMENTARY
+  CULTURE
+  BUSINESS
+}
+
+model Video {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  title       String
+  description String
+  countryId   String?
+  kind        VideoKind @default(NEWS)
+  durationSec Int
+  imageSeed   String
+  provider    String? // "youtube" | "vimeo" | null while unpublished
+  externalId  String?
+  published   Boolean   @default(true)
+  publishedAt DateTime  @default(now())
+
+  country Country? @relation(fields: [countryId], references: [id], onDelete: SetNull)
+
+  @@index([published, publishedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Homepage control, newsletter, advertising
+// ---------------------------------------------------------------------------
+
+// One row per editor-controlled homepage position.
+model HomepageSlot {
+  id        String  @id @default(cuid())
+  slot      String  @unique // "lead", "secondary-1", "somalia-lead", ...
+  articleId String?
+  updatedAt DateTime @updatedAt
+
+  article Article? @relation(fields: [articleId], references: [id], onDelete: SetNull)
+}
+
+enum NewsletterEdition {
+  DAILY
+  WEEKLY
+  SOMALIA
+  ETHIOPIA
+  DJIBOUTI
+  ERITREA
+}
+
+model NewsletterSub {
+  id          String            @id @default(cuid())
+  email       String
+  edition     NewsletterEdition @default(DAILY)
+  countryPref String?
+  confirmed   Boolean           @default(false)
+  createdAt   DateTime          @default(now())
+
+  @@unique([email, edition])
+}
+
+model AdSlot {
+  id       String  @id @default(cuid())
+  position String  @unique // header | homepage-mid | sidebar | in-article | footer
+  label    String
+  active   Boolean @default(false)
+  html     String? // creative markup, sanitised on render
+  linkUrl  String?
+
+  @@index([active])
+}
+
+model SiteSetting {
+  key   String @id
+  value String
+}
+
+// ---------------------------------------------------------------------------
+// News aggregation — "The Wire"
+//
+// Aggregated content is deliberately kept in its own models rather than mixed
+// into Article. It is never our reporting, it is never edited into our voice,
+// and it must never appear in Trending or a homepage lead slot. We store a
+// headline, a short excerpt and a link; the full text stays on the publisher's
+// own site, where their advertising and their byline are.
+// ---------------------------------------------------------------------------
+
+enum SourceKind {
+  REGIONAL // an outlet based in or focused on one Horn country
+  HORN // covers the Horn as a region
+  PANAFRICAN // continental
+  INTERNATIONAL // global wires and broadcasters
+}
+
+model Source {
+  id          String     @id @default(cuid())
+  slug        String     @unique
+  name        String
+  homepageUrl String
+  feedUrl     String     @unique
+  kind        SourceKind @default(REGIONAL)
+  language    String     @default("en")
+  countryId   String? // the country this outlet primarily covers
+  active      Boolean    @default(true)
+  order       Int        @default(0)
+  note        String? // why it is inactive, permission status, etc.
+
+  // State-owned or state-linked outlets are badged for readers rather than
+  // excluded. Editors can change this in the CMS as ownership changes.
+  stateAffiliated Boolean @default(false)
+
+  // Health, so a silently-dead feed is visible rather than just absent.
+  lastFetchedAt DateTime?
+  lastStatus    String? // "ok" | "http 403" | "timeout" | ...
+  lastError     String?
+  lastItemCount Int       @default(0)
+  failureCount  Int       @default(0)
+
+  country Country?   @relation(fields: [countryId], references: [id], onDelete: SetNull)
+  items   WireItem[]
+
+  @@index([active, order])
+}
+
+model WireItem {
+  id       String @id @default(cuid())
+  sourceId String
+
+  // Publishers reuse guids inconsistently, so uniqueness is per source.
+  guid    String
+  url     String @unique
+  title   String
+  excerpt String // capped and stripped at ingest; never the full body
+  author  String?
+  imageUrl String?
+
+  publishedAt DateTime
+  fetchedAt   DateTime @default(now())
+  hidden      Boolean  @default(false) // moderator can suppress an item
+  clicks      Int      @default(0)
+
+  source    Source            @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  countries WireItemCountry[]
+
+  @@unique([sourceId, guid])
+  @@index([publishedAt])
+  @@index([hidden, publishedAt])
+}
+
+// Same idea as ArticleCountry: one wire item can be relevant to several
+// countries, so it surfaces on each of their pages without being duplicated.
+model WireItemCountry {
+  wireItemId String
+  countryId  String
+
+  wireItem WireItem @relation(fields: [wireItemId], references: [id], onDelete: Cascade)
+  country  Country  @relation(fields: [countryId], references: [id], onDelete: Cascade)
+
+  @@id([wireItemId, countryId])
+  @@index([countryId])
+}

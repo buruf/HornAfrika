@@ -1,0 +1,19 @@
+node_modules/
+.next/
+out/
+build/
+
+# Databases
+*.db
+*.db-journal
+
+# Secrets. .env.example is the committed template; every real env file stays out.
+.env
+.env.*
+!.env.example
+
+.DS_Store
+next-env.d.ts
+.vercel
+tsconfig.tsbuildinfo
+coverage/
