@@ -5,12 +5,30 @@ import { getBreaking } from "@/lib/queries";
 import { articleHref } from "@/lib/format";
 import { SITE } from "@/lib/site";
 
+/**
+ * Every page under this layout is rendered per request.
+ *
+ * The header carries a live breaking-news ticker, so nothing here can be
+ * meaningfully prerendered — and without this, Next tried to build the static
+ * pages at compile time, which made the *build* depend on the database being
+ * reachable. A paused database or a network blip would then fail a deploy on a
+ * site that has no genuinely static pages to begin with.
+ */
+export const dynamic = "force-dynamic";
+
 export default async function SiteLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const breaking = await getBreaking();
+  // The ticker is chrome, not content. If the database is briefly unreachable
+  // the right outcome is a page without a ticker, not an error page.
+  let breaking: Awaited<ReturnType<typeof getBreaking>> = [];
+  try {
+    breaking = await getBreaking();
+  } catch (err) {
+    console.error("Breaking ticker unavailable:", err);
+  }
 
   const organisationSchema = {
     "@context": "https://schema.org",
