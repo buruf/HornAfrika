@@ -164,17 +164,51 @@ are pruned.
 
 ## Before deploying
 
-1. Change every seeded password, and set a strong `AUTH_SECRET`.
-2. Point `DATABASE_URL` at Postgres and change the Prisma `datasource` provider.
-3. Set `NEXT_PUBLIC_SITE_URL` to the real origin — canonicals, OG images,
-   sitemap and JSON-LD all derive from it.
-4. Replace the placeholder social links in `TopBar` and `SiteFooter`.
-5. Decide what to do with the seeded articles: keep them as background, or
+The schema now targets **Postgres**. For offline local work, change the one
+`provider` line in `prisma/schema.prisma` to `"sqlite"`, point `DATABASE_URL` at
+`file:./dev.db`, and run `npm run db:reset`.
+
+### Deploy runbook
+
+```bash
+# 1. Environment (Vercel)
+vercel env add DATABASE_URL production          # Neon pooled connection string
+vercel env add AUTH_SECRET production           # 48 random bytes, base64url
+vercel env add NEXT_PUBLIC_SITE_URL production  # the real origin, no trailing slash
+vercel env add CRON_SECRET production           # 32 random bytes, base64url
+
+# 2. Schema and content, run locally against the production database
+DATABASE_URL="<neon-url>" npx prisma db push
+DATABASE_URL="<neon-url>" SEED_ENV=production \
+  ADMIN_EMAIL="you@example.com" ADMIN_PASSWORD="<20+ chars>" npm run db:seed
+
+# 3. Ship
+vercel --prod
+```
+
+Generate the secrets with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+```
+
+### What production does differently
+
+- **The demo accounts are never created.** `npm run db:seed` refuses to run in
+  production without `ADMIN_EMAIL` and `ADMIN_PASSWORD`, and creates exactly one
+  Super Admin from them. The five shared-password accounts are development only.
+- **The login page hides the credential hint.** It renders only when
+  `NODE_ENV !== "production"`.
+- **The seed refuses to wipe live content.** It deletes every table before
+  inserting, so against a production database holding articles it aborts unless
+  `SEED_RESET=yes-delete-everything` is set deliberately.
+
+### Still yours to do
+
+1. Replace the placeholder social links in `TopBar` and `SiteFooter`.
+2. Decide what to do with the seeded articles: keep them as background, or
    archive them as real reporting arrives.
-6. Set `CRON_SECRET` and point a scheduler at `/api/cron/aggregate` — every
-   20–30 minutes is sensible. Without it the wire only updates when someone
-   presses "Fetch all now".
-7. Consider writing to the publishers whose feeds are switched off, and to the
+3. Consider writing to the publishers whose feeds are switched off, and to the
    ones you rely on most. Aggregation works better as a relationship than as a
    crawl.
 
