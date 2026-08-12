@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { pruneWire, runAggregation } from "@/lib/aggregator";
 import { getSession } from "@/lib/auth";
+import { reportError } from "@/lib/report-error";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -40,22 +41,44 @@ export async function GET(req: Request) {
   const force = url.searchParams.get("force") === "1";
   const only = url.searchParams.get("source") ?? undefined;
 
-  const { results, added, durationMs } = await runAggregation({ force, only });
-  const pruned = await pruneWire();
+  // Nobody watches a cron run. If the whole job throws, or if enough sources
+  // fail that the wire is effectively stale, that has to reach /admin/errors
+  // rather than dying in a log nobody opens.
+  try {
+    const { results, added, durationMs } = await runAggregation({ force, only });
+    const pruned = await pruneWire();
 
-  return NextResponse.json({
-    ok: true,
-    added,
-    pruned,
-    durationMs,
-    sources: results.length,
-    failed: results.filter((r) => !r.ok).map((r) => ({
-      source: r.sourceSlug,
-      status: r.status,
-      error: r.error,
-    })),
-    results,
-  });
+    const failed = results.filter((r) => !r.ok);
+    if (results.length > 0 && failed.length > results.length / 2) {
+      await reportError(
+        new Error(
+          `Wire aggregation degraded: ${failed.length} of ${results.length} sources failed ` +
+            `(${failed.map((f) => `${f.sourceSlug}:${f.status}`).join(", ")})`,
+        ),
+        { kind: "cron", path: "/api/cron/aggregate" },
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      added,
+      pruned,
+      durationMs,
+      sources: results.length,
+      failed: failed.map((r) => ({
+        source: r.sourceSlug,
+        status: r.status,
+        error: r.error,
+      })),
+      results,
+    });
+  } catch (err) {
+    await reportError(err, { kind: "cron", path: "/api/cron/aggregate" });
+    return NextResponse.json(
+      { ok: false, error: "Aggregation failed" },
+      { status: 500 },
+    );
+  }
 }
 
 export const POST = GET;

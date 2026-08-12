@@ -24,7 +24,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     db.country.findMany({ include: { regions: true } }),
     db.category.findMany(),
     db.video.findMany({ where: { published: true }, select: { slug: true, publishedAt: true } }),
-    db.author.findMany({ select: { slug: true } }),
+    // Desks have no author page, so listing them would emit 404s.
+    db.author.findMany({ where: { isDesk: false }, select: { slug: true } }),
   ]);
 
   const staticPages = [

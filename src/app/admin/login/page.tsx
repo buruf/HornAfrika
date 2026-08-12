@@ -14,12 +14,12 @@ export const metadata: Metadata = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; next?: string }>;
+  searchParams: Promise<{ error?: string; next?: string; wait?: string }>;
 }) {
   const session = await getSession();
   if (session) redirect("/admin");
 
-  const { error, next } = await searchParams;
+  const { error, next, wait } = await searchParams;
 
   return (
     <div className="flex min-h-[70vh] items-center justify-center px-5 py-14">
@@ -38,10 +38,17 @@ export default async function LoginPage({
         <form action={login} className="mt-7 border border-rule bg-white p-6">
           <input type="hidden" name="next" value={next ?? "/admin"} />
 
-          {error && (
-            <p className="mb-4 border-l-[3px] border-brand bg-[#fdf0f1] px-3 py-2 text-[0.84rem] text-[#8a1020]">
-              Those credentials were not recognised.
+          {error === "throttled" ? (
+            <p className="mb-4 border-l-[3px] border-[#a8730f] bg-[#fdf8ec] px-3 py-2 text-[0.84rem] text-[#6b5312]">
+              Too many sign-in attempts. Try again in about{" "}
+              {Number(wait) > 1 ? `${Number(wait)} minutes` : "a minute"}.
             </p>
+          ) : (
+            error && (
+              <p className="mb-4 border-l-[3px] border-brand bg-[#fdf0f1] px-3 py-2 text-[0.84rem] text-[#8a1020]">
+                Those credentials were not recognised.
+              </p>
+            )
           )}
 
           <label className="block text-[0.72rem] font-extrabold uppercase tracking-[0.1em] text-ink-mute">

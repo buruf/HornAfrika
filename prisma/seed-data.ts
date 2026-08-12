@@ -136,21 +136,43 @@ export const TOPICS = [
   "remittances", "shipping", "borders", "peacekeeping",
 ];
 
-export const AUTHORS = [
-  { slug: "amina-warsame", name: "Amina Warsame", title: "Regional Correspondent", location: "Mogadishu", avatarSeed: "aw-01", bio: "Covers Somali federal politics and the Horn's diplomatic track. Based in Mogadishu." },
-  { slug: "dawit-bekele", name: "Dawit Bekele", title: "Business Editor", location: "Addis Ababa", avatarSeed: "db-02", bio: "Writes on Ethiopian macroeconomics, trade corridors and the region's investment climate." },
-  { slug: "hodan-ali", name: "Hodan Ali", title: "Senior Reporter, Security", location: "Nairobi", avatarSeed: "ha-03", bio: "Reports on security and conflict across the Horn with an emphasis on verification and restraint." },
-  { slug: "ismail-houmed", name: "Ismail Houmed", title: "Djibouti Correspondent", location: "Djibouti City", avatarSeed: "ih-04", bio: "Covers ports, logistics and the maritime economy of the Bab el-Mandeb." },
-  { slug: "senait-ghebre", name: "Senait Ghebre", title: "Culture Editor", location: "Asmara", avatarSeed: "sg-05", bio: "Writes on music, heritage and the arts across the four countries of the Horn." },
-  { slug: "yusuf-abdi", name: "Yusuf Abdi", title: "Sports Correspondent", location: "Hargeisa", avatarSeed: "ya-06", bio: "Follows football, athletics and grassroots sport in the Horn and its diaspora." },
-  { slug: "meron-tesfaye", name: "Meron Tesfaye", title: "Explainers Editor", location: "Addis Ababa", avatarSeed: "mt-07", bio: "Builds the background, maps and timelines behind the region's most consequential stories." },
-  { slug: "khadra-jama", name: "Khadra Jama", title: "People Editor", location: "London", avatarSeed: "kj-08", bio: "Profiles and long-form interviews with the entrepreneurs, scientists and artists of the Horn and its diaspora." },
+/**
+ * Bylines.
+ *
+ * The launch scaffolding is attributed to a desk, not to invented reporters.
+ * An earlier version of this file created eight fictional journalists with
+ * names, job titles, locations and bios, attached them to 46 articles, gave
+ * them author pages and emitted them to search engines as schema.org Person.
+ * A disclaimer at the foot of an article does not undo a byline that says
+ * "Regional Correspondent, Mogadishu" about someone who does not exist.
+ *
+ * Real journalists get real author records, created through the CMS when they
+ * are hired.
+ */
+export const DESK_AUTHOR = {
+  slug: "hornafrika-desk",
+  name: "Hornafrika Desk",
+  title: "Editorial Desk",
+  location: null as string | null,
+  avatarSeed: "desk",
+  isDesk: true,
+  bio: "Written and compiled by the Hornafrika editorial desk. Desk copy carries background and context rather than original reporting; work by a named journalist is signed by that journalist.",
+};
+
+/**
+ * Development-only fixtures, so the editorial workflow can be exercised
+ * locally. Named unmistakably as tests — they are never seeded in production
+ * and must never read as staff.
+ */
+export const DEV_AUTHORS = [
+  { slug: "test-journalist", name: "Test Journalist", title: "Test Fixture", location: null, avatarSeed: "test-j", isDesk: false, bio: "Development fixture for exercising the journalist role. Not a real person." },
+  { slug: "test-contributor", name: "Test Contributor", title: "Test Fixture", location: null, avatarSeed: "test-c", isDesk: false, bio: "Development fixture for exercising the contributor role. Not a real person." },
 ];
 
 export const USERS = [
   { email: "admin@hornafrika.com", name: "Platform Owner", role: "SUPER_ADMIN", password: "hornafrika", author: null },
-  { email: "editor@hornafrika.com", name: "Amina Warsame", role: "EDITOR", password: "hornafrika", author: "amina-warsame" },
-  { email: "journalist@hornafrika.com", name: "Dawit Bekele", role: "JOURNALIST", password: "hornafrika", author: "dawit-bekele" },
-  { email: "contributor@hornafrika.com", name: "Yusuf Abdi", role: "CONTRIBUTOR", password: "hornafrika", author: "yusuf-abdi" },
-  { email: "moderator@hornafrika.com", name: "Community Moderator", role: "MODERATOR", password: "hornafrika", author: null },
+  { email: "editor@hornafrika.com", name: "Test Editor", role: "EDITOR", password: "hornafrika", author: null },
+  { email: "journalist@hornafrika.com", name: "Test Journalist", role: "JOURNALIST", password: "hornafrika", author: "test-journalist" },
+  { email: "contributor@hornafrika.com", name: "Test Contributor", role: "CONTRIBUTOR", password: "hornafrika", author: "test-contributor" },
+  { email: "moderator@hornafrika.com", name: "Test Moderator", role: "MODERATOR", password: "hornafrika", author: null },
 ];

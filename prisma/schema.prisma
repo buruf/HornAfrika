@@ -118,6 +118,15 @@ model Author {
   avatarSeed String
   location   String?
 
+  /**
+   * A desk is an institutional byline — "Hornafrika Desk" — not a person.
+   * It exists so that copy without a named reporter is still attributable
+   * without inventing one. Article schema emits Organization for a desk and
+   * Person only for a real journalist, so we never publish structured data
+   * claiming a byline belongs to someone who does not exist.
+   */
+  isDesk Boolean @default(false)
+
   articles Article[]
   user     User?
 }
@@ -438,4 +447,46 @@ model WireItemCountry {
 
   @@id([wireItemId, countryId])
   @@index([countryId])
+}
+
+// ---------------------------------------------------------------------------
+// Operations
+// ---------------------------------------------------------------------------
+
+/**
+ * Fixed-window rate limiting, in the database.
+ *
+ * Serverless functions do not share memory, so an in-process counter limits
+ * nothing once there are two instances. Postgres is the only state every
+ * invocation already shares, and login attempts are far too low-volume for the
+ * write cost to matter.
+ */
+model RateLimit {
+  key         String   @id
+  count       Int      @default(0)
+  windowStart DateTime @default(now())
+
+  @@index([windowStart])
+}
+
+/**
+ * Errors, kept where the operator can see them.
+ *
+ * A solo newsroom will not notice a 3am exception in a log stream. These rows
+ * back /admin/errors so failures are visible without a third-party service; if
+ * Sentry is added later this becomes redundant rather than in the way.
+ */
+model ErrorLog {
+  id        String   @id @default(cuid())
+  message   String
+  stack     String?
+  digest    String?
+  path      String?
+  kind      String   @default("server")
+  count     Int      @default(1)
+  createdAt DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  @@index([lastSeenAt])
+  @@index([digest])
 }

@@ -25,7 +25,9 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 export default async function AuthorPage({ params }: Params) {
   const { slug } = await params;
   const author = await db.author.findUnique({ where: { slug } });
-  if (!author) notFound();
+  // A desk gets no profile page — it is a byline, not a journalist, and a
+  // page with a bio would imply a person standing behind it.
+  if (!author || author.isDesk) notFound();
 
   const articles = await db.article.findMany({
     where: { ...publishedWhere, authorId: author.id },

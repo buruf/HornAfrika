@@ -1,6 +1,6 @@
 import { PrismaClient, type Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import { COUNTRIES, CATEGORIES, TOPICS, AUTHORS, USERS } from "./seed-data";
+import { COUNTRIES, CATEGORIES, TOPICS, DESK_AUTHOR, DEV_AUTHORS, USERS } from "./seed-data";
 import { ARTICLES, VIDEOS } from "./seed-articles";
 import { SOURCES } from "./seed-sources";
 
@@ -134,9 +134,19 @@ async function main() {
 
   console.log("Seeding authors and users…");
   const authorBySlug: Record<string, string> = {};
-  for (const a of AUTHORS) {
-    const author = await prisma.author.create({ data: a });
-    authorBySlug[a.slug] = author.id;
+
+  // The desk is the only byline that ships. Scaffolding is attributed to it
+  // rather than to invented reporters; real journalists are added through the
+  // CMS when they exist.
+  const desk = await prisma.author.create({ data: DESK_AUTHOR });
+  authorBySlug[DESK_AUTHOR.slug] = desk.id;
+
+  if (!IS_PRODUCTION) {
+    for (const a of DEV_AUTHORS) {
+      const author = await prisma.author.create({ data: a });
+      authorBySlug[a.slug] = author.id;
+    }
+    console.log(`  development: + ${DEV_AUTHORS.length} test-fixture authors`);
   }
   // The five demo accounts share a password that is printed in the README and
   // in this repository. Creating them on a public deployment would hand the

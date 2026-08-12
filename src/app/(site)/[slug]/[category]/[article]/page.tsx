@@ -96,12 +96,16 @@ export default async function ArticlePage({ params }: Params) {
     description: a.deck,
     datePublished: a.publishedAt?.toISOString(),
     dateModified: (a.revisedAt ?? a.updatedAt).toISOString(),
-    author: {
-      "@type": "Person",
-      name: a.author.name,
-      jobTitle: a.author.title,
-      url: `${SITE.url}/authors/${a.author.slug}`,
-    },
+    // A desk byline is an Organization. Emitting Person for it would publish
+    // structured data asserting a journalist exists when none does.
+    author: a.author.isDesk
+      ? { "@type": "Organization", name: a.author.name, url: SITE.url }
+      : {
+          "@type": "Person",
+          name: a.author.name,
+          jobTitle: a.author.title,
+          url: `${SITE.url}/authors/${a.author.slug}`,
+        },
     publisher: {
       "@type": "NewsMediaOrganization",
       name: SITE.name,
@@ -205,12 +209,17 @@ export default async function ArticlePage({ params }: Params) {
             {/* --------------------------------------------- byline block */}
             <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 border-y border-rule py-3">
               <div>
-                <Link
-                  href={`/authors/${a.author.slug}`}
-                  className="text-[0.88rem] font-bold hover:text-brand"
-                >
-                  {a.author.name}
-                </Link>
+                {/* A desk is not a person and gets no author page. */}
+                {a.author.isDesk ? (
+                  <span className="text-[0.88rem] font-bold">{a.author.name}</span>
+                ) : (
+                  <Link
+                    href={`/authors/${a.author.slug}`}
+                    className="text-[0.88rem] font-bold hover:text-brand"
+                  >
+                    {a.author.name}
+                  </Link>
+                )}
                 <p className="text-[0.75rem] text-ink-mute">{a.author.title}</p>
               </div>
               <div className="text-[0.78rem] text-ink-mute">
@@ -307,14 +316,18 @@ export default async function ArticlePage({ params }: Params) {
             {/* ------------------------------------------------ author card */}
             <div className="mt-8 border border-rule bg-white p-5">
               <p className="text-[0.66rem] font-extrabold uppercase tracking-[0.13em] text-ink-mute">
-                About the author
+                {a.author.isDesk ? "About this byline" : "About the author"}
               </p>
-              <Link
-                href={`/authors/${a.author.slug}`}
-                className="mt-1.5 block text-[1.05rem] font-extrabold hover:text-brand"
-              >
-                {a.author.name}
-              </Link>
+              {a.author.isDesk ? (
+                <p className="mt-1.5 text-[1.05rem] font-extrabold">{a.author.name}</p>
+              ) : (
+                <Link
+                  href={`/authors/${a.author.slug}`}
+                  className="mt-1.5 block text-[1.05rem] font-extrabold hover:text-brand"
+                >
+                  {a.author.name}
+                </Link>
+              )}
               <p className="text-[0.8rem] text-ink-mute">
                 {a.author.title}
                 {a.author.location ? ` · ${a.author.location}` : ""}

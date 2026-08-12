@@ -1,9 +1,24 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { clientIp, rateLimit } from "@/lib/rate-limit";
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 export async function POST(req: Request) {
+  // An unauthenticated endpoint that writes a row on every call. Ten signups
+  // per address per hour is far above honest use and well below useful abuse.
+  const limit = await rateLimit(
+    `newsletter:${clientIp(req.headers)}`,
+    10,
+    60 * 60_000,
+  );
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Too many signups from this connection. Try again later." },
+      { status: 429, headers: { "retry-after": String(limit.retryAfterSeconds) } },
+    );
+  }
+
   let body: { email?: string; countryPref?: string; edition?: string };
   try {
     body = await req.json();

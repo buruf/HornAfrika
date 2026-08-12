@@ -13,7 +13,11 @@ export const metadata: Metadata = {
 };
 
 export default async function AuthorsPage() {
+  // Only real people are listed. The desk is a byline, not a journalist, and
+  // padding this page with it would recreate the newsroom this site does not
+  // yet have.
   const authors = await db.author.findMany({
+    where: { isDesk: false },
     orderBy: { name: "asc" },
     include: {
       _count: {
@@ -31,8 +35,26 @@ export default async function AuthorsPage() {
       <PageHeader
         eyebrow="Newsroom"
         title="Our Journalists"
-        blurb="Every article on Hornafrika carries a named author. These are the reporters and editors who write them."
+        blurb="Work by a named journalist is signed by that journalist, and their articles are collected here. Background and context written by the editorial desk carries the desk's byline instead."
       />
+
+      {authors.length === 0 && (
+        <div className="mt-8 border border-rule bg-white p-8">
+          <p className="text-[1rem] font-bold">
+            No journalists are on the masthead yet.
+          </p>
+          <p className="mt-2 max-w-2xl text-[0.92rem] leading-relaxed text-ink-soft">
+            Everything published so far is desk copy — background and context,
+            written from documented material rather than original reporting. We
+            would rather say that than invent a byline. If you report from the
+            Horn and want to write here, see{" "}
+            <Link href="/careers" className="font-semibold text-brand underline">
+              careers
+            </Link>
+            .
+          </p>
+        </div>
+      )}
 
       <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {authors.map((a) => (

@@ -20,6 +20,7 @@ const NAV = [
   { href: "/admin/subscribers", label: "Subscribers", perm: "subscribers.view" },
   { href: "/admin/ads", label: "Advertising", perm: "ads.manage" },
   { href: "/admin/users", label: "Users", perm: "users.manage" },
+  { href: "/admin/errors", label: "Errors", perm: "ads.manage" },
 ] as const;
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

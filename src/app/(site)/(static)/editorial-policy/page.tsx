@@ -56,8 +56,15 @@ export default function EditorialPolicyPage() {
 
       <H2>Bylines</H2>
       <p>
-        Every article names its author. Authors have public profiles showing their beat,
-        location and previous work. Unsigned articles are not published.
+        Every article is attributed. Work by a named journalist is signed by that
+        journalist, who has a public profile showing their beat, location and previous
+        work. Background and context written in-house carries the byline{" "}
+        <strong>Hornafrika Desk</strong>.
+      </p>
+      <p>
+        A desk byline means no individual reporter stands behind the piece. We use it
+        rather than inventing a name. Nothing here is signed by a journalist who does
+        not exist, and no real person&rsquo;s name is attached to work they did not do.
       </p>
 
       <H2>Independence</H2>
