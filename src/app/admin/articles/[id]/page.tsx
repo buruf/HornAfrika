@@ -94,6 +94,14 @@ export default async function EditArticlePage({
             View live ↗
           </Link>
         )}
+        {can(session.role, "article.editAny") && (
+          <Link
+            href={`/admin/articles/${article.id}/translate`}
+            className="border border-rule-strong px-3 py-1 text-[0.74rem] font-bold uppercase tracking-[0.05em] hover:border-ink"
+          >
+            Translate
+          </Link>
+        )}
       </div>
 
       <h1 className="text-[1.5rem] font-extrabold leading-tight tracking-[-0.03em]">

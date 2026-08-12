@@ -101,7 +101,6 @@ describe("rateLimit()", () => {
     };
     const r = await rateLimit("k", 1, WINDOW);
     expect(r.ok).toBe(true);
-    // @ts-expect-error restoring the mock
     db.rateLimit.findUnique = original;
   });
 

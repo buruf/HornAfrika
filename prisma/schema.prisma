@@ -222,6 +222,7 @@ model Article {
   views        ArticleView[]
   editorialLog EditorialLog[]
   homepageSlot HomepageSlot[]
+  translations ArticleTranslation[]
 
   @@index([status, publishedAt])
   @@index([countryId, status, publishedAt])
@@ -489,4 +490,68 @@ model ErrorLog {
 
   @@index([lastSeenAt])
   @@index([digest])
+}
+
+// ---------------------------------------------------------------------------
+// Translation
+// ---------------------------------------------------------------------------
+
+enum Locale {
+  EN
+  SO
+  AM
+  AR
+  TI
+  FR
+}
+
+/**
+ * A translated version of an article.
+ *
+ * Kept as rows rather than columns on Article because languages are additive:
+ * adding Tigrinya must not be a migration, and an article translated into two
+ * languages must not carry four empty columns.
+ *
+ * Translations carry their own review state. An article being published in
+ * English says nothing about whether its Somali version has been read by
+ * anyone who speaks Somali, and a half-finished translation of a security
+ * story is worse than no translation at all — so a translation is only served
+ * once it is PUBLISHED in its own right.
+ */
+enum TranslationStatus {
+  DRAFT
+  REVIEW
+  PUBLISHED
+}
+
+model ArticleTranslation {
+  id        String @id @default(cuid())
+  articleId String
+  locale    Locale
+
+  headline String
+  deck     String
+  body     String
+
+  status TranslationStatus @default(DRAFT)
+
+  /** Who produced and who checked it — both recorded, neither invented. */
+  translatedBy String?
+  reviewedBy   String?
+
+  /**
+   * True when a machine produced the first draft. Editorial policy forbids
+   * publishing unreviewed machine output, so this exists to make that
+   * reviewable rather than to hide it.
+   */
+  machineAssisted Boolean @default(false)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, locale])
+  @@index([locale, status])
 }

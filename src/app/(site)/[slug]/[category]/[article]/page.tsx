@@ -16,10 +16,16 @@ import { NewsletterForm } from "@/components/NewsletterForm";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { SITE } from "@/lib/site";
 
+import type { Locale } from "@prisma/client";
+import { DEFAULT_LOCALE, LOCALES, localeFromSegment } from "@/lib/locales";
+import { articleText, availableLocales } from "@/lib/translations";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+
 export const dynamic = "force-dynamic";
 
 type Params = {
   params: Promise<{ slug: string; category: string; article: string }>;
+  searchParams: Promise<{ lang?: string }>;
 };
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
@@ -31,10 +37,23 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     a.canonicalUrl ??
     `${SITE.url}/${a.country?.slug ?? "horn"}/${a.category.slug}/${a.slug}`;
 
+  // hreflang for every language this article is genuinely readable in, so a
+  // Somali speaker searching in Somali is sent to the Somali version rather
+  // than to English. Listing languages that do not exist would be worse than
+  // listing none.
+  const languages: Record<string, string> = {};
+  for (const l of await availableLocales(a.id)) {
+    languages[LOCALES[l].tag] =
+      l === DEFAULT_LOCALE ? canonical : `${canonical}?lang=${LOCALES[l].tag}`;
+  }
+
   return {
     title: a.seoTitle ?? a.headline,
     description: a.seoDescription ?? a.deck,
-    alternates: { canonical },
+    alternates: {
+      canonical,
+      ...(Object.keys(languages).length > 1 ? { languages } : {}),
+    },
     openGraph: {
       type: "article",
       title: a.headline,
@@ -55,17 +74,26 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   };
 }
 
-export default async function ArticlePage({ params }: Params) {
+export default async function ArticlePage({ params, searchParams }: Params) {
   const { article: articleSlug } = await params;
   const a = await getArticle(articleSlug);
   if (!a) notFound();
 
   const countryIds = a.countries.map((c) => c.countryId);
 
-  const [related, trending] = await Promise.all([
+  // Which language the reader asked for, and which this piece actually exists
+  // in. An unknown or unavailable code silently falls back to English rather
+  // than erroring — a bad URL should not break a news page.
+  const requested = localeFromSegment((await searchParams).lang ?? "");
+  const [available, related, trending] = await Promise.all([
+    availableLocales(a.id),
     getRelated(a.id, a.categoryId, countryIds),
     getTrending("week", 5),
   ]);
+  const locale: Locale =
+    requested && available.includes(requested) ? requested : DEFAULT_LOCALE;
+  const text = await articleText(a, locale);
+  const localeInfo = LOCALES[text.locale];
 
   // "More from <country>" blocks for every country the story touches.
   const moreFrom = await Promise.all(
@@ -198,13 +226,35 @@ export default async function ArticlePage({ params }: Params) {
               {a.isBreaking && <span className="chip">Breaking</span>}
             </div>
 
-            <h1 className="max-w-4xl text-[1.85rem] font-extrabold leading-[1.1] tracking-[-0.032em] sm:text-[2.45rem]">
-              {a.headline}
-            </h1>
+            {/* lang and dir are set on the text itself, not the page, because
+                the surrounding chrome stays English until a whole edition is
+                translated. Ethiopic and Arabic also need more line height than
+                Latin at the same size or the diacritics collide. */}
+            <div
+              lang={localeInfo.tag}
+              dir={localeInfo.dir}
+              className={
+                localeInfo.script === "latin" ? "" : "leading-relaxed [&_h1]:leading-[1.25]"
+              }
+            >
+              <h1 className="max-w-4xl text-[1.85rem] font-extrabold leading-[1.1] tracking-[-0.032em] sm:text-[2.45rem]">
+                {text.headline}
+              </h1>
 
-            <p className="mt-4 max-w-3xl text-[1.1rem] leading-relaxed text-ink-soft">
-              {a.deck}
-            </p>
+              <p className="mt-4 max-w-3xl text-[1.1rem] leading-relaxed text-ink-soft">
+                {text.deck}
+              </p>
+            </div>
+
+            <LanguageSwitcher
+              available={available}
+              current={text.locale}
+              hrefFor={(l) =>
+                l === DEFAULT_LOCALE
+                  ? canonical.replace(SITE.url, "")
+                  : `${canonical.replace(SITE.url, "")}?lang=${LOCALES[l].tag}`
+              }
+            />
 
             {/* --------------------------------------------- byline block */}
             <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 border-y border-rule py-3">
@@ -271,8 +321,24 @@ export default async function ArticlePage({ params }: Params) {
               </p>
             )}
 
-            <div className="mt-6 max-w-[46rem]">
-              <ArticleBody body={a.body} />
+            {text.isTranslation && (
+              <p className="mt-5 border-l-[3px] border-[#1b5fa8] bg-[#eff5fb] px-4 py-3 text-[0.86rem] leading-relaxed text-[#134878]">
+                <strong className="mr-1.5 font-extrabold uppercase tracking-[0.08em]">
+                  Translation
+                </strong>
+                Translated into {LOCALES[text.locale].name}
+                {text.translatedBy ? ` by ${text.translatedBy}` : ""}
+                {text.reviewedBy ? `, reviewed by ${text.reviewedBy}` : ""}. Where this
+                differs from the English original, the English text stands.
+              </p>
+            )}
+
+            <div
+              className="mt-6 max-w-[46rem]"
+              lang={localeInfo.tag}
+              dir={localeInfo.dir}
+            >
+              <ArticleBody body={text.body} />
             </div>
 
             <AdSlot position="in-article" className="mt-8 max-w-[46rem]" />

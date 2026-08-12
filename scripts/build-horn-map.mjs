@@ -14,6 +14,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import polygonClipping from "polygon-clipping";
 
 const SRC =
   "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson";
@@ -108,6 +109,28 @@ for (const c of FOCUS) {
   if (!byCode.has(c)) throw new Error(`Missing required country: ${c}`);
 }
 console.log("  matched:", [...byCode.keys()].join(", "));
+
+// ------------------------------------------------------------------ union
+//
+// Natural Earth carries Somaliland as its own admin-0 unit. Collecting its
+// rings alongside Somalia's is not the same as merging them: two adjacent
+// polygons still share an edge, and stroking both draws that edge as a border
+// running through the middle of Somalia — exactly the line the map is not
+// supposed to assert.
+//
+// A geometric union dissolves the shared edge and leaves one outline. Running
+// it for every country is harmless: genuine islands (the Dahlak archipelago,
+// Yemen's Socotra) do not touch anything, so the union returns them unchanged.
+for (const [c, rings] of byCode) {
+  const before = rings.length;
+  // polygon-clipping takes an array of polygons, each an array of rings.
+  const merged = polygonClipping.union(rings.map((r) => [r]));
+  const flattened = merged.flatMap((poly) => poly);
+  byCode.set(c, flattened);
+  if (flattened.length !== before) {
+    console.log(`  union ${c}: ${before} rings -> ${flattened.length}`);
+  }
+}
 
 // ------------------------------------------------------------- project
 // Mercator, then fit the four focus countries to the viewBox. Context
