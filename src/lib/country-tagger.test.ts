@@ -91,6 +91,37 @@ describe("detectCountries() — tagging by text, never by publisher", () => {
     expect(detectCountries("ናይ ኤርትራ ዜና")).toEqual(["eritrea"]);
   });
 
+  it("tags business copy that names an institution but never the country", () => {
+    // Regression from the first live pull: genuine Addis business reporting
+    // was being hidden because the headline said "Anbesa Bank", not Ethiopia.
+    expect(detectCountries("National Bank Forces Anbesa Bank Board Re-run")).toEqual([
+      "ethiopia",
+    ]);
+    expect(detectCountries("Ethio Telecom reports subscriber growth")).toEqual([
+      "ethiopia",
+    ]);
+    expect(detectCountries("Tariffs push costs up by 40 million birr")).toEqual([
+      "ethiopia",
+    ]);
+    expect(detectCountries("Hormuud launches new data bundles")).toEqual(["somalia"]);
+    expect(detectCountries("Dahabshiil expands remittance network")).toEqual([
+      "somalia",
+    ]);
+  });
+
+  it("still ignores world copy republished by a regional outlet", () => {
+    // These all came from Somali and Ethiopian outlets on the live pull. A
+    // masthead is not evidence of subject matter.
+    for (const headline of [
+      "Trump Calls for Iran to Pay Compensation as Deal Prospects Dim",
+      "Syria's Bashar al-Assad Sentenced to Death in Absentia by Court",
+      "7.4-magnitude earthquake destroys Manizales Cathedral",
+      "Police probe Widdecombe suspect in arson attack linked to Nigel Farage",
+    ]) {
+      expect(detectCountries(headline)).toEqual([]);
+    }
+  });
+
   it("picks up institutions and landmarks, not just country names", () => {
     expect(detectCountries("Al-Shabaab attack repelled in Middle Shabelle")).toEqual([
       "somalia",

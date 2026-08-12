@@ -34,19 +34,25 @@ const visible: Prisma.WireItemWhereInput = { hidden: false };
  * claim is the Horn of Africa, that is not "extra coverage", it is noise
  * crowding out the thing readers came for.
  *
- * An item qualifies if either:
- *  - its text mentions one of the four countries (so BBC on Ethiopia stays), or
- *  - it came from a regional, Horn-wide or pan-African outlet, which are about
- *    this part of the world by construction.
+ * The rule is the same one used for tagging: the item's own text decides,
+ * never the masthead. An item is shown if it names one of the four countries.
  *
- * Untagged international items are still stored — the tagger improves, and
- * re-tagging is cheaper than re-fetching — they are simply not shown.
+ * Whitelisting outlets was tried twice against the live pull and failed twice.
+ * Trusting pan-African sources let in Libyan oil fires and Syrian politics.
+ * Trusting Somali and Ethiopian outlets still let in Trump, Assad, Musk, Nigel
+ * Farage and a Colombian earthquake — regional newsrooms republish world copy
+ * like everyone else. A masthead is not evidence of subject matter.
+ *
+ * The cost is that a genuine regional story whose wording the tagger does not
+ * recognise is hidden. That is a tagger gap, and the fix belongs there — see
+ * the institution terms in country-tagger.ts — not in a source whitelist that
+ * waves through everything an outlet happens to publish.
+ *
+ * Untagged items are still stored, since the tagger improves and re-tagging is
+ * cheaper than re-fetching. They are simply not shown.
  */
 const hornRelevant: Prisma.WireItemWhereInput = {
-  OR: [
-    { countries: { some: {} } },
-    { source: { kind: { in: ["REGIONAL", "HORN", "PANAFRICAN"] } } },
-  ],
+  countries: { some: {} },
 };
 
 export async function getWire(opts: {
