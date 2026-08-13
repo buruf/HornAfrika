@@ -44,6 +44,44 @@ export default async function WireAboutPage() {
         own site, where their advertising and their byline are.
       </p>
 
+      <H2>Copyright</H2>
+      <p>
+        <strong>
+          Copyright in every aggregated headline, extract and photograph remains
+          with the newsroom that published it.
+        </strong>{" "}
+        Hornafrika claims no ownership of any of it. Each item names its
+        publisher, carries a copyright line, and links to the original.
+      </p>
+      <p>
+        We take only what is needed to tell a reader that a story exists and
+        send them to it — a headline, a short extract, a link. We do not
+        reproduce publishers&rsquo; photographs at all: an image is their
+        property and their bandwidth, so the wire carries text only and the
+        picture stays where the article is.
+      </p>
+      <p>
+        If you publish in the Horn and want your work removed from the wire,
+        write to{" "}
+        <a
+          href="mailto:newsroom@hornafrika.com"
+          className="font-semibold text-brand underline"
+        >
+          newsroom@hornafrika.com
+        </a>{" "}
+        and we will remove it. We will not ask you to justify the request.
+      </p>
+
+      <H2>Photography on our own articles</H2>
+      <p>
+        Articles written by the Hornafrika desk carry photographs from Wikimedia
+        Commons published under free licences — Creative Commons, or public
+        domain. Every one names the photographer, states the licence, and links
+        to the original file so the terms can be checked. Where a photograph
+        illustrates a place rather than documenting the specific event reported,
+        the caption says so.
+      </p>
+
       <H2>How it is kept separate</H2>
       <p>
         Aggregated headlines live in their own section and their own visual style, and

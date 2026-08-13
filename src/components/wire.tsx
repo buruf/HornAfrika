@@ -125,14 +125,23 @@ export function WireRow({ item }: { item: WireCardItem }) {
         </p>
       )}
 
-      <a
-        href={item.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mt-1.5 inline-block text-[0.74rem] font-bold text-ink-mute hover:text-brand"
-      >
-        Read at {item.source.name} ↗
-      </a>
+      <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[0.74rem] font-bold text-ink-mute hover:text-brand"
+        >
+          Read at {item.source.name} ↗
+        </a>
+        {/* Ownership stated on the item itself. The headline and extract are
+            the publisher's work, not ours, and saying so here is clearer than
+            burying it in a policy page nobody opens. */}
+        <span className="text-[0.72rem] text-ink-mute">
+          Headline and extract © {item.source.name} — reproduced for reference,
+          full article at the publisher.
+        </span>
+      </div>
     </article>
   );
 }
@@ -153,7 +162,11 @@ export function WireNotice({ compact = false }: { compact?: boolean }) {
     <p className="text-[0.83rem] leading-relaxed text-ink-soft">
       These are headlines published by other newsrooms, not Hornafrika reporting.
       We show the headline, a short extract and a link; the full article stays
-      with the publisher who wrote it.{" "}
+      with the publisher who wrote it, and{" "}
+      <strong className="text-ink">
+        copyright in each headline and extract remains with that publisher
+      </strong>
+      .{" "}
       <Link href="/wire/about" className="font-semibold text-brand underline">
         How the wire works
       </Link>

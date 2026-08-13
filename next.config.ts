@@ -7,9 +7,12 @@ const nextConfig: NextConfig = {
   // so tracing does not walk out of the project.
   outputFileTracingRoot: import.meta.dirname,
   images: {
-    // Editorial SVG placeholders are served locally today. When real
-    // photography arrives via the CMS, add its host here.
-    remotePatterns: [],
+    // Freely licensed photography from Wikimedia Commons. Publisher-owned
+    // images are deliberately absent: the wire links out to the publisher
+    // rather than reproducing their pictures.
+    remotePatterns: [
+      { protocol: "https", hostname: "upload.wikimedia.org" },
+    ],
   },
   experimental: {
     optimizePackageImports: [],

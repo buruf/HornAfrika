@@ -198,7 +198,11 @@ model Article {
   imageSeed    String
   imageUrl     String? // real photography once licensed; overrides the SVG
   imageCaption String
-  imageCredit  String?
+  imageCredit  String? // photographer or agency
+  /** Licence name, e.g. "CC BY-SA 4.0". Displayed with the credit. */
+  imageLicense String?
+  /** Link to the original file page, so the licence can be checked. */
+  imageSourceUrl String?
   sourceNote   String? // "Source:" line where a claim needs attribution
 
   seoTitle       String?

@@ -293,12 +293,37 @@ export default async function ArticlePage({ params, searchParams }: Params) {
                 priority
                 className="h-[240px] w-full object-cover sm:h-[340px] lg:h-[430px]"
               />
-              <figcaption className="mt-2 flex flex-wrap gap-x-2 text-[0.76rem] text-ink-mute">
-                <span>{a.imageCaption}</span>
-                <span className="font-semibold">
-                  {a.imageCredit ??
-                    (a.imageUrl ? "" : "Illustration: Hornafrika editorial graphic")}
-                </span>
+              {/* Credit and licence, always. A freely licensed photograph
+                  still carries conditions, and naming the photographer is the
+                  price of using their work. */}
+              <figcaption className="mt-2 text-[0.76rem] leading-relaxed text-ink-mute">
+                <span>{a.imageCaption}</span>{" "}
+                {a.imageUrl ? (
+                  <span className="whitespace-normal">
+                    <span className="font-semibold">
+                      Photograph: {a.imageCredit ?? "Unknown"}
+                    </span>
+                    {a.imageLicense && <> · {a.imageLicense}</>}
+                    {a.imageSourceUrl && (
+                      <>
+                        {" "}
+                        ·{" "}
+                        <a
+                          href={a.imageSourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer nofollow"
+                          className="underline hover:text-brand"
+                        >
+                          source
+                        </a>
+                      </>
+                    )}
+                  </span>
+                ) : (
+                  <span className="font-semibold">
+                    Illustration: Hornafrika editorial graphic
+                  </span>
+                )}
               </figcaption>
             </figure>
 
