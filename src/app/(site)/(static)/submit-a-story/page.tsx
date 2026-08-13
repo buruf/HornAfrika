@@ -46,10 +46,21 @@ export default function SubmitStoryPage() {
         with <em>Pitch</em> in the subject line.
       </p>
 
+      <H2>Reporters in the region</H2>
+      <p>
+        If you are a reporter in Somalia, Ethiopia, Djibouti or Eritrea and would
+        like to contribute to this website, you can do so by{" "}
+        <Link href="/contribute" className="font-semibold text-brand underline">
+          registering first
+        </Link>{" "}
+        — once you have been verified, you will be able to upload your own news
+        articles, and each one is published after an editor has reviewed it.
+      </p>
+
       <H2>Contributor submissions</H2>
       <p>
-        Contributors with accounts on our content management system can file drafts
-        directly, which enter the editorial review queue. Everything submitted is read by an
+        Verified contributors file drafts directly in our newsroom system, and those
+        drafts enter the editorial review queue. Everything submitted is read by an
         editor before it can be published — nothing goes live unreviewed.
       </p>
 

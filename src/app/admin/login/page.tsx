@@ -38,7 +38,22 @@ export default async function LoginPage({
         <form action={login} className="mt-7 border border-rule bg-white p-6">
           <input type="hidden" name="next" value={next ?? "/admin"} />
 
-          {error === "throttled" ? (
+          {error === "pending" ? (
+            <p className="mb-4 border-l-[3px] border-[#1b5fa8] bg-[#eff5fb] px-3 py-2 text-[0.84rem] leading-relaxed text-[#134878]">
+              Your application to contribute is with an editor. We check that
+              every reporter is who they say they are before opening an account,
+              and we will email you either way.
+            </p>
+          ) : error === "declined" ? (
+            <p className="mb-4 border-l-[3px] border-brand bg-[#fdf0f1] px-3 py-2 text-[0.84rem] leading-relaxed text-[#8a1020]">
+              This account is not active. If you think that is a mistake, write
+              to newsroom@hornafrika.com.
+            </p>
+          ) : error === "disabled" ? (
+            <p className="mb-4 border-l-[3px] border-brand bg-[#fdf0f1] px-3 py-2 text-[0.84rem] text-[#8a1020]">
+              This account has been suspended.
+            </p>
+          ) : error === "throttled" ? (
             <p className="mb-4 border-l-[3px] border-[#a8730f] bg-[#fdf8ec] px-3 py-2 text-[0.84rem] text-[#6b5312]">
               Too many sign-in attempts. Try again in about{" "}
               {Number(wait) > 1 ? `${Number(wait)} minutes` : "a minute"}.

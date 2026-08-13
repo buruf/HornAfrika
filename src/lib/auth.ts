@@ -18,7 +18,23 @@ function secret() {
 
 export type Session = { userId: string; email: string; role: Role; name: string };
 
-export async function signIn(email: string, password: string) {
+/**
+ * Sign-in outcome.
+ *
+ * "pending" and "declined" are reported separately from "bad credentials", but
+ * only ever after the password has already been verified. A reporter who has
+ * applied needs to know their application is being read rather than be told
+ * their details are wrong; someone guessing email addresses learns nothing,
+ * because a wrong password still returns the same generic failure.
+ */
+export type SignInResult =
+  | { ok: true; session: Session }
+  | { ok: false; reason: "invalid" | "pending" | "declined" | "disabled" };
+
+export async function signIn(
+  email: string,
+  password: string,
+): Promise<SignInResult> {
   const user = await db.user.findUnique({
     where: { email: email.trim().toLowerCase() },
   });
@@ -28,7 +44,13 @@ export async function signIn(email: string, password: string) {
   const hash = user?.passwordHash ?? "$2a$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidnn";
   const ok = bcrypt.compareSync(password, hash);
 
-  if (!user || !ok || !user.active) return null;
+  if (!user || !ok) return { ok: false, reason: "invalid" };
+
+  // From here the password is correct, so telling the truth about the account
+  // state reveals nothing to an attacker who does not already have it.
+  if (user.contributorStatus === "PENDING") return { ok: false, reason: "pending" };
+  if (user.contributorStatus === "DECLINED") return { ok: false, reason: "declined" };
+  if (!user.active) return { ok: false, reason: "disabled" };
 
   const token = await new SignJWT({
     email: user.email,
@@ -50,7 +72,15 @@ export async function signIn(email: string, password: string) {
     maxAge: MAX_AGE,
   });
 
-  return { userId: user.id, email: user.email, role: user.role, name: user.name };
+  return {
+    ok: true,
+    session: {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      name: user.name,
+    },
+  };
 }
 
 export async function signOut() {

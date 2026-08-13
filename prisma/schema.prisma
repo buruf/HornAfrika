@@ -131,6 +131,19 @@ model Author {
   user     User?
 }
 
+/**
+ * Where a self-registered reporter is in the verification process.
+ *
+ * Accounts created by an administrator are VERIFIED outright; only people who
+ * applied through /contribute start as PENDING. A PENDING account exists but
+ * cannot sign in, so an unverified applicant has no access to anything.
+ */
+enum ContributorStatus {
+  PENDING
+  VERIFIED
+  DECLINED
+}
+
 enum Role {
   SUPER_ADMIN
   EDITOR
@@ -150,6 +163,20 @@ model User {
 
   authorId String? @unique
   author   Author? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  // ---- Self-registration by local reporters (see /contribute) ------------
+  contributorStatus ContributorStatus @default(VERIFIED)
+  /** Where they report from. Shown to the admin reviewing the application. */
+  location    String?
+  /** Their own account of who they are and what they cover. */
+  applicationNote String?
+  /** Links to published work — the main thing an admin checks. */
+  workLinks   String?
+  appliedAt   DateTime?
+  reviewedAt  DateTime?
+  reviewedBy  String?
+  /** Why an application was declined. Never shown to the applicant verbatim. */
+  reviewNote  String?
 
   editorialLogs EditorialLog[]
 }

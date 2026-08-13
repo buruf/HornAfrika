@@ -19,6 +19,7 @@ const NAV = [
   { href: "/admin/sources", label: "Wire", perm: "taxonomy.manage" },
   { href: "/admin/subscribers", label: "Subscribers", perm: "subscribers.view" },
   { href: "/admin/ads", label: "Advertising", perm: "ads.manage" },
+  { href: "/admin/contributors", label: "Contributors", perm: "article.editAny" },
   { href: "/admin/users", label: "Users", perm: "users.manage" },
   { href: "/admin/errors", label: "Errors", perm: "ads.manage" },
 ] as const;

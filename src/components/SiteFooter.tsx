@@ -131,6 +131,7 @@ export async function SiteFooter() {
                 ["Privacy", "/privacy"],
                 ["Terms", "/terms"],
                 ["Careers", "/careers"],
+                ["Report for us", "/contribute"],
                 ["Advertise", "/advertise"],
                 ["Submit a Story", "/submit-a-story"],
               ].map(([label, href]) => (

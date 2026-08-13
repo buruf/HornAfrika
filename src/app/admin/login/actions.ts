@@ -37,10 +37,12 @@ export async function login(formData: FormData) {
 
   const result = await signIn(email, password);
 
-  // One message for every failure mode — a wrong password and an unknown
-  // address must be indistinguishable from outside.
-  if (!result) {
-    redirect(`/admin/login?error=1&next=${encodeURIComponent(next)}`);
+  if (!result.ok) {
+    // A wrong password and an unknown address are indistinguishable. The
+    // application states are only reachable once the password was correct.
+    const code =
+      result.reason === "invalid" ? "1" : result.reason;
+    redirect(`/admin/login?error=${code}&next=${encodeURIComponent(next)}`);
   }
 
   // A successful sign-in clears the account counter, so someone who mistypes
