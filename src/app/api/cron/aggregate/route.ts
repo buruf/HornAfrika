@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { pruneWire, runAggregation } from "@/lib/aggregator";
 import { getSession } from "@/lib/auth";
 import { reportError } from "@/lib/report-error";
+import { pruneViewDays } from "@/lib/views";
+import { wireChanged } from "@/lib/revalidate";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -47,6 +49,12 @@ export async function GET(req: Request) {
   try {
     const { results, added, durationMs } = await runAggregation({ force, only });
     const pruned = await pruneWire();
+    // Daily readership rows are tiny, but unbounded is still unbounded.
+    const prunedViewDays = await pruneViewDays();
+
+    // The wire is cached for ten minutes; without this the first readers after
+    // a fetch would keep seeing the previous pull.
+    wireChanged();
 
     const failed = results.filter((r) => !r.ok);
     if (results.length > 0 && failed.length > results.length / 2) {
@@ -63,6 +71,7 @@ export async function GET(req: Request) {
       ok: true,
       added,
       pruned,
+      prunedViewDays,
       durationMs,
       sources: results.length,
       failed: failed.map((r) => ({

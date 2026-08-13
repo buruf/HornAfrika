@@ -1,6 +1,7 @@
 ﻿import { redirect } from "next/navigation";
 import { CountryFlag } from "@/components/CountryFlag";
 import { revalidatePath } from "next/cache";
+import { taxonomyChanged } from "@/lib/revalidate";
 import { db } from "@/lib/db";
 import { getSession, can } from "@/lib/auth";
 
@@ -54,6 +55,7 @@ export default async function TaxonomyPage({
       },
     });
     revalidatePath("/", "layout");
+  taxonomyChanged();
     redirect("/admin/taxonomy?saved=region");
   }
 
@@ -69,6 +71,7 @@ export default async function TaxonomyPage({
       create: { name, slug: slugify(name) },
     });
     revalidatePath("/", "layout");
+  taxonomyChanged();
     redirect("/admin/taxonomy?saved=topic");
   }
 
@@ -89,6 +92,7 @@ export default async function TaxonomyPage({
       },
     });
     revalidatePath("/", "layout");
+  taxonomyChanged();
     redirect("/admin/taxonomy?saved=author");
   }
 

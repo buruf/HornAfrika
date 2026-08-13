@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
+import { taxonomyChanged } from "@/lib/revalidate";
 import { db } from "@/lib/db";
 import { getSession, can } from "@/lib/auth";
 import { formatDuration, formatShortDate } from "@/lib/format";
@@ -58,6 +59,7 @@ export default async function AdminVideosPage({
       },
     });
     revalidatePath("/", "layout");
+  taxonomyChanged();
     redirect("/admin/videos?saved=1");
   }
 
@@ -70,6 +72,7 @@ export default async function AdminVideosPage({
     if (!v) redirect("/admin/videos");
     await db.video.update({ where: { id }, data: { published: !v.published } });
     revalidatePath("/", "layout");
+  taxonomyChanged();
     redirect("/admin/videos");
   }
 

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { articleChanged } from "@/lib/revalidate";
 import { redirect } from "next/navigation";
 import type { ArticleStatus, Placement } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -110,6 +111,7 @@ export async function saveArticle(formData: FormData) {
 
     await syncRelations(id, formData);
     revalidatePath("/", "layout");
+  articleChanged();
     redirect(`/admin/articles/${id}?saved=1`);
   }
 
@@ -227,6 +229,7 @@ export async function transitionArticle(formData: FormData) {
   ]);
 
   revalidatePath("/", "layout");
+  articleChanged();
   redirect(`/admin/articles/${id}?moved=1`);
 }
 
@@ -237,5 +240,6 @@ export async function deleteArticle(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   await db.article.delete({ where: { id } });
   revalidatePath("/", "layout");
+  articleChanged();
   redirect("/admin/articles?deleted=1");
 }

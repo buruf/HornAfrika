@@ -1,6 +1,20 @@
 import { db } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
 import { cache } from "react";
+import { startOfUtcDay } from "@/lib/views";
+import { TAGS, TTL, cached } from "@/lib/cache";
+
+/**
+ * Two layers of caching here, doing different jobs.
+ *
+ * `cache()` from React deduplicates within a single render — the homepage asks
+ * for countries four times and gets one query.
+ *
+ * `cached()` from lib/cache is the Next data cache and persists across
+ * requests, so a burst of readers costs one query rather than one each. Pages
+ * stay `force-dynamic` so the build never needs a database; it is the data,
+ * not the page, that is cached.
+ */
 
 /** Everything a card needs, and nothing more. */
 export const cardSelect = {
@@ -32,35 +46,59 @@ export const publishedWhere: Prisma.ArticleWhereInput = {
 // Navigation and site chrome
 // ---------------------------------------------------------------------------
 
-export const getCountries = cache(async () =>
-  db.country.findMany({ orderBy: { order: "asc" } }),
-);
-
-export const getNavCategories = cache(async () =>
-  db.category.findMany({ where: { inNav: true }, orderBy: { order: "asc" } }),
-);
-
-export const getAllCategories = cache(async () =>
-  db.category.findMany({
-    orderBy: { order: "asc" },
-    include: { subcategories: { orderBy: { order: "asc" } } },
+// Taxonomy is read on every page render and changes perhaps monthly.
+export const getCountries = cache(
+  cached(() => db.country.findMany({ orderBy: { order: "asc" } }), "countries", {
+    tags: [TAGS.taxonomy],
+    revalidate: TTL.taxonomy,
   }),
 );
 
-export const getCountriesWithRegions = cache(async () =>
-  db.country.findMany({
-    orderBy: { order: "asc" },
-    include: { regions: { orderBy: { order: "asc" } } },
-  }),
+export const getNavCategories = cache(
+  cached(
+    () => db.category.findMany({ where: { inNav: true }, orderBy: { order: "asc" } }),
+    "nav-categories",
+    { tags: [TAGS.taxonomy], revalidate: TTL.taxonomy },
+  ),
 );
 
-export const getBreaking = cache(async () =>
-  db.article.findMany({
-    where: { ...publishedWhere, isBreaking: true },
-    orderBy: { publishedAt: "desc" },
-    take: 8,
-    select: cardSelect,
-  }),
+export const getAllCategories = cache(
+  cached(
+    () =>
+      db.category.findMany({
+        orderBy: { order: "asc" },
+        include: { subcategories: { orderBy: { order: "asc" } } },
+      }),
+    "all-categories",
+    { tags: [TAGS.taxonomy], revalidate: TTL.taxonomy },
+  ),
+);
+
+export const getCountriesWithRegions = cache(
+  cached(
+    () =>
+      db.country.findMany({
+        orderBy: { order: "asc" },
+        include: { regions: { orderBy: { order: "asc" } } },
+      }),
+    "countries-with-regions",
+    { tags: [TAGS.taxonomy], revalidate: TTL.taxonomy },
+  ),
+);
+
+// The ticker sits in the layout, so this runs on literally every page.
+export const getBreaking = cache(
+  cached(
+    () =>
+      db.article.findMany({
+        where: { ...publishedWhere, isBreaking: true },
+        orderBy: { publishedAt: "desc" },
+        take: 8,
+        select: cardSelect,
+      }),
+    "breaking",
+    { tags: [TAGS.articles], revalidate: TTL.articles },
+  ),
 );
 
 // ---------------------------------------------------------------------------
@@ -72,13 +110,21 @@ export const getBreaking = cache(async () =>
  * to the most recent qualifying story so the page is never broken, but the
  * editor's choice always wins.
  */
+const loadHomepageSlots = cached(
+  async () => {
+    const slots = await db.homepageSlot.findMany({
+      include: { article: { select: cardSelect } },
+    });
+    // The cache serialises to JSON, and a Map does not survive that, so the
+    // cached shape is an array and the Map is rebuilt per request.
+    return slots.map((s) => [s.slot, s.article] as [string, CardArticle | null]);
+  },
+  "homepage-slots",
+  { tags: [TAGS.homepage, TAGS.articles], revalidate: TTL.articles },
+);
+
 export const getHomepageSlots = cache(async () => {
-  const slots = await db.homepageSlot.findMany({
-    include: { article: { select: cardSelect } },
-  });
-  const map = new Map<string, CardArticle | null>();
-  for (const s of slots) map.set(s.slot, s.article);
-  return map;
+  return new Map<string, CardArticle | null>(await loadHomepageSlots());
 });
 
 export async function getLeadAndSecondaries() {
@@ -123,16 +169,19 @@ const WINDOW_DAYS: Record<TrendingWindow, number> = {
   month: 30,
 };
 
-export const getTrending = cache(
-  async (window: TrendingWindow = "week", take = 5): Promise<CardArticle[]> => {
+const loadTrending = cached(
+  async (window: TrendingWindow, take: number): Promise<CardArticle[]> => {
     const since = new Date();
     since.setDate(since.getDate() - WINDOW_DAYS[window]);
 
-    const grouped = await db.articleView.groupBy({
+    // Summing a daily rollup rather than counting individual view rows. The
+    // old query grouped every page view in the window, so its cost grew with
+    // traffic — on the most-requested page on the site.
+    const grouped = await db.articleViewDaily.groupBy({
       by: ["articleId"],
-      where: { viewedAt: { gte: since } },
-      _count: { articleId: true },
-      orderBy: { _count: { articleId: "desc" } },
+      where: { day: { gte: startOfUtcDay(since) } },
+      _sum: { count: true },
+      orderBy: { _sum: { count: "desc" } },
       take: take * 4,
     });
     if (grouped.length === 0) return [];
@@ -152,13 +201,24 @@ export const getTrending = cache(
         if (!article?.publishedAt) return null;
         const ageDays = (now - article.publishedAt.getTime()) / 86400000;
         const decay = 1 / Math.pow(ageDays + 2, 0.45);
-        return { article, score: g._count.articleId * decay };
+        return { article, score: (g._sum.count ?? 0) * decay };
       })
       .filter(Boolean) as { article: CardArticle; score: number }[];
 
     scored.sort((a, b) => b.score - a.score);
     return scored.slice(0, take).map((s) => s.article);
   },
+  "trending",
+  { tags: [TAGS.articles], revalidate: TTL.trending },
+);
+
+/**
+ * Trending is the only algorithmic block on the site and nothing invalidates
+ * it — readership accumulates continuously — so it relies on its TTL rather
+ * than on a tag being busted.
+ */
+export const getTrending = cache((window: TrendingWindow = "week", take = 5) =>
+  loadTrending(window, take),
 );
 
 // ---------------------------------------------------------------------------
@@ -319,19 +379,24 @@ export async function getVideos(take = 8, kind?: string) {
 // Article
 // ---------------------------------------------------------------------------
 
-export const getArticle = cache(async (slug: string) =>
-  db.article.findFirst({
-    where: { slug, ...publishedWhere },
-    include: {
-      country: true,
-      region: true,
-      category: true,
-      subcategory: true,
-      author: true,
-      countries: { include: { country: true } },
-      topics: { include: { topic: true } },
-    },
-  }),
+export const getArticle = cache(
+  cached(
+    (slug: string) =>
+      db.article.findFirst({
+        where: { slug, ...publishedWhere },
+        include: {
+          country: true,
+          region: true,
+          category: true,
+          subcategory: true,
+          author: true,
+          countries: { include: { country: true } },
+          topics: { include: { topic: true } },
+        },
+      }),
+    "article",
+    { tags: [TAGS.articles], revalidate: TTL.articles },
+  ),
 );
 
 export async function getRelated(articleId: string, categoryId: string, countryIds: string[]) {
@@ -352,15 +417,29 @@ export async function getRelated(articleId: string, categoryId: string, countryI
   });
 }
 
-export const getCategoryCounts = cache(async () => {
-  const rows = await db.article.groupBy({
-    by: ["categoryId"],
-    where: publishedWhere,
-    _count: { categoryId: true },
-  });
-  return new Map(rows.map((r) => [r.categoryId, r._count.categoryId]));
-});
+const loadCategoryCounts = cached(
+  async () => {
+    const rows = await db.article.groupBy({
+      by: ["categoryId"],
+      where: publishedWhere,
+      _count: { categoryId: true },
+    });
+    // Array rather than Map, because the cache serialises to JSON.
+    return rows.map((r) => [r.categoryId, r._count.categoryId] as [string, number]);
+  },
+  "category-counts",
+  { tags: [TAGS.articles], revalidate: TTL.articles },
+);
 
-export const getActiveAd = cache(async (position: string) =>
-  db.adSlot.findFirst({ where: { position, active: true } }),
+export const getCategoryCounts = cache(
+  async () => new Map<string, number>(await loadCategoryCounts()),
+);
+
+// Ad slots are read on nearly every page and change almost never.
+export const getActiveAd = cache(
+  cached(
+    (position: string) => db.adSlot.findFirst({ where: { position, active: true } }),
+    "active-ad",
+    { tags: [TAGS.ads], revalidate: TTL.config },
+  ),
 );

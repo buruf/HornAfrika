@@ -44,7 +44,7 @@ async function main() {
   await prisma.wireItemCountry.deleteMany();
   await prisma.wireItem.deleteMany();
   await prisma.source.deleteMany();
-  await prisma.articleView.deleteMany();
+  await prisma.articleViewDaily.deleteMany();
   await prisma.editorialLog.deleteMany();
   await prisma.homepageSlot.deleteMany();
   await prisma.articleTopic.deleteMany();
@@ -250,21 +250,30 @@ async function main() {
       },
     });
 
-    // Synthesise view events so trending has something real to rank.
-    // Views are distributed across the window since publication, weighted
-    // toward the first days, which is how readership actually behaves.
-    const events: Prisma.ArticleViewCreateManyInput[] = [];
+    // Synthesise readership so trending has something real to rank, as one
+    // row per day rather than one per view. Readership is weighted toward the
+    // days just after publication, which is how it actually behaves.
     const span = Math.max(1, a.daysAgo + 1);
+    const perDay = new Map<number, number>();
     for (let i = 0; i < a.views; i++) {
       const bias = Math.pow(Math.random(), 2); // clusters near publication
-      const offsetDays = bias * span;
-      const viewedAt = new Date(publishedAt.getTime() + offsetDays * 86400000);
+      const viewedAt = new Date(publishedAt.getTime() + bias * span * 86400000);
       if (viewedAt > new Date()) continue;
-      events.push({ articleId: article.id, viewedAt });
+      const day = Date.UTC(
+        viewedAt.getUTCFullYear(),
+        viewedAt.getUTCMonth(),
+        viewedAt.getUTCDate(),
+      );
+      perDay.set(day, (perDay.get(day) ?? 0) + 1);
     }
-    // createMany in chunks keeps SQLite parameter counts sane.
-    for (let i = 0; i < events.length; i += 500) {
-      await prisma.articleView.createMany({ data: events.slice(i, i + 500) });
+    if (perDay.size > 0) {
+      await prisma.articleViewDaily.createMany({
+        data: [...perDay].map(([day, count]) => ({
+          articleId: article.id,
+          day: new Date(day),
+          count,
+        })),
+      });
     }
   }
 
@@ -347,7 +356,7 @@ async function main() {
     regions: await prisma.region.count(),
     categories: await prisma.category.count(),
     articles: await prisma.article.count(),
-    views: await prisma.articleView.count(),
+    viewDayRows: await prisma.articleViewDaily.count(),
     videos: await prisma.video.count(),
     users: await prisma.user.count(),
     sources: await prisma.source.count(),

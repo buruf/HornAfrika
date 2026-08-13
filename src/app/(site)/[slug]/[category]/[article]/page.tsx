@@ -19,6 +19,7 @@ import { SITE } from "@/lib/site";
 import type { Locale } from "@prisma/client";
 import { DEFAULT_LOCALE, LOCALES, localeFromSegment } from "@/lib/locales";
 import { articleText, availableLocales } from "@/lib/translations";
+import { recordView } from "@/lib/views";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 export const dynamic = "force-dynamic";
@@ -107,7 +108,7 @@ export default async function ArticlePage({ params, searchParams }: Params) {
   // without putting a write on the reader's critical path.
   after(async () => {
     try {
-      await db.articleView.create({ data: { articleId: a.id } });
+      await recordView(a.id);
     } catch {
       // A missed view must never surface as a page error.
     }

@@ -25,8 +25,9 @@ export default async function AdminOverview() {
       include: { article: { select: { headline: true, slug: true } }, user: true },
     }),
     db.newsletterSub.count(),
-    db.articleView.count({
-      where: { viewedAt: { gte: new Date(Date.now() - 86400000) } },
+    db.articleViewDaily.aggregate({
+      _sum: { count: true },
+      where: { day: { gte: new Date(Date.now() - 86400000) } },
     }),
     db.article.count({ where: { isSeed: true } }),
   ]);
@@ -69,7 +70,10 @@ export default async function AdminOverview() {
       <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { label: "Total articles", value: total },
-          { label: "Reads (24h)", value: views24h.toLocaleString("en-GB") },
+          {
+            label: "Reads (24h)",
+            value: (views24h._sum.count ?? 0).toLocaleString("en-GB"),
+          },
           { label: "Newsletter subscribers", value: subs },
           { label: "Launch scaffolding", value: seedCount },
         ].map((s) => (

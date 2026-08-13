@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
+import { homepageChanged } from "@/lib/revalidate";
 import { db } from "@/lib/db";
 import { getSession, can, STATUS_LABEL } from "@/lib/auth";
 import { formatShortDate } from "@/lib/format";
@@ -68,6 +69,7 @@ export default async function AdminHomepagePage({
       });
     }
     revalidatePath("/", "layout");
+  homepageChanged();
     redirect("/admin/homepage?saved=1");
   }
 

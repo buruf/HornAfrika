@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { adsChanged } from "@/lib/revalidate";
 import { db } from "@/lib/db";
 import { getSession, can } from "@/lib/auth";
 
@@ -33,6 +34,7 @@ export default async function AdsPage({
       },
     });
     revalidatePath("/", "layout");
+  adsChanged();
     redirect("/admin/ads?saved=1");
   }
 

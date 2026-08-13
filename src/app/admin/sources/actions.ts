@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { wireChanged } from "@/lib/revalidate";
 import { db } from "@/lib/db";
 import { can, getSession } from "@/lib/auth";
 import { runAggregation, pruneWire } from "@/lib/aggregator";
@@ -49,6 +50,7 @@ export async function addSource(formData: FormData) {
   });
 
   revalidatePath("/", "layout");
+  wireChanged();
   redirect("/admin/sources?saved=added");
 }
 
@@ -73,6 +75,7 @@ export async function updateSource(formData: FormData) {
   });
 
   revalidatePath("/", "layout");
+  wireChanged();
   redirect("/admin/sources?saved=updated");
 }
 
@@ -82,6 +85,7 @@ export async function deleteSource(formData: FormData) {
 
   await db.source.delete({ where: { id: String(formData.get("id") ?? "") } });
   revalidatePath("/", "layout");
+  wireChanged();
   redirect("/admin/sources?saved=deleted");
 }
 
@@ -94,6 +98,7 @@ export async function fetchNow(formData: FormData) {
   await pruneWire();
 
   revalidatePath("/", "layout");
+  wireChanged();
   redirect(`/admin/sources?fetched=${added}`);
 }
 
@@ -107,5 +112,6 @@ export async function toggleHidden(formData: FormData) {
 
   await db.wireItem.update({ where: { id }, data: { hidden: !item.hidden } });
   revalidatePath("/", "layout");
+  wireChanged();
   redirect("/admin/sources?saved=moderated");
 }

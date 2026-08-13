@@ -219,7 +219,7 @@ model Article {
 
   countries    ArticleCountry[]
   topics       ArticleTopic[]
-  views        ArticleView[]
+  views        ArticleViewDaily[]
   editorialLog EditorialLog[]
   homepageSlot HomepageSlot[]
   translations ArticleTranslation[]
@@ -255,17 +255,29 @@ model ArticleTopic {
   @@index([topicId])
 }
 
-// Raw view events. Trending aggregates these with a recency weight rather
-// than sorting by publication date (spec §19).
-model ArticleView {
-  id        String   @id @default(cuid())
+/**
+ * Daily readership, one row per article per day.
+ *
+ * This replaced a table with one row per page view. That table reached 49,000
+ * rows on synthetic seed data alone, and trending ran a groupBy across thirty
+ * days of it on every homepage render — a query whose cost grows with traffic,
+ * on the page that gets the most of it.
+ *
+ * A daily counter answers every question trending actually asks (how much was
+ * this read, in this window) at roughly one row per article per day: a few
+ * thousand rows a year rather than one per reader. Per-view granularity was
+ * never used for anything.
+ */
+model ArticleViewDaily {
   articleId String
-  viewedAt  DateTime @default(now())
+  /** Midnight UTC for the day being counted. */
+  day       DateTime
+  count     Int      @default(0)
 
   article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
 
-  @@index([viewedAt])
-  @@index([articleId, viewedAt])
+  @@id([articleId, day])
+  @@index([day])
 }
 
 model EditorialLog {

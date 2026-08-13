@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { articleChanged } from "@/lib/revalidate";
 import { redirect } from "next/navigation";
 import type { Locale, TranslationStatus } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -47,6 +48,7 @@ export async function saveTranslation(formData: FormData) {
   });
 
   revalidatePath("/", "layout");
+  articleChanged();
   redirect(`/admin/articles/${articleId}/translate?locale=${locale}&saved=1`);
 }
 
@@ -86,5 +88,6 @@ export async function setTranslationStatus(formData: FormData) {
   });
 
   revalidatePath("/", "layout");
+  articleChanged();
   redirect(`/admin/articles/${articleId}/translate?locale=${locale}&moved=1`);
 }
