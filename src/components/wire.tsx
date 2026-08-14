@@ -193,6 +193,85 @@ function CountryChips({ item }: { item: WireCardItem }) {
 }
 
 /**
+ * The lead card at the top of the homepage.
+ *
+ * Bigger than anything else on the wire, because it is the first thing a
+ * reader sees and it has to carry the claim that this site is current. It
+ * still obeys every wire rule — outlet named first and prominently, headline
+ * links off-site with ↗, extract not body, copyright stated — so nobody can
+ * mistake it for our own reporting just because it is large.
+ *
+ * The image is the publisher's, hotlinked rather than copied, and is
+ * decorative: it carries no information the headline does not, so it is
+ * marked aria-hidden and the link text stands alone for screen readers.
+ */
+export function WireHero({ item }: { item: WireCardItem }) {
+  return (
+    <article className="grid gap-5 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] md:items-start">
+      {item.imageUrl && (
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          tabIndex={-1}
+          aria-hidden
+          className="block overflow-hidden bg-shell"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={item.imageUrl}
+            alt=""
+            loading="eager"
+            className="h-[210px] w-full object-cover transition-transform duration-500 hover:scale-[1.03] sm:h-[280px]"
+          />
+        </a>
+      )}
+
+      <div className={item.imageUrl ? "" : "md:col-span-2"}>
+        <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+          <a
+            href={item.source.homepageUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[0.78rem] font-extrabold uppercase tracking-[0.08em] text-brand hover:underline"
+          >
+            {item.source.name}
+          </a>
+          {item.source.stateAffiliated && <StateTag />}
+          <CountryChips item={item} />
+          <span className="meta">{timeAgo(item.publishedAt)}</span>
+        </div>
+
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group mt-2 block"
+        >
+          <h3 className="text-[1.5rem] font-extrabold leading-[1.14] tracking-[-0.02em] group-hover:text-brand sm:text-[1.85rem]">
+            {item.title}
+            <span className="ml-1.5 text-[1rem] font-normal text-ink-mute" aria-hidden>
+              ↗
+            </span>
+          </h3>
+        </a>
+
+        {item.excerpt && (
+          <p className="clamp-4 mt-2.5 text-[0.95rem] leading-relaxed text-ink-soft">
+            {item.excerpt}
+          </p>
+        )}
+
+        <p className="mt-2.5 text-[0.74rem] text-ink-mute">
+          Headline, extract and picture © {item.source.name} — reproduced for
+          reference, full article at the publisher.
+        </p>
+      </div>
+    </article>
+  );
+}
+
+/**
  * The wire's front-page band.
  *
  * This sits high on the homepage because it is the only part of the front page

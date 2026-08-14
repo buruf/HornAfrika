@@ -9,6 +9,10 @@ export const wireSelect = {
   url: true,
   author: true,
   publishedAt: true,
+  // The publisher's own thumbnail, where the feed offers one (about half do).
+  // Used for the homepage lead; hotlinked to the publisher rather than copied,
+  // which is the same posture as the headline itself.
+  imageUrl: true,
   source: {
     select: {
       slug: true,
@@ -139,6 +143,47 @@ export function balanceByCountry<
 export async function getWireBand(take = 11, countrySlugs: string[]) {
   const pool = await getWire({ take: 120 });
   return balanceByCountry(pool, take, countrySlugs);
+}
+
+/**
+ * The lead slot at the very top of the homepage.
+ *
+ * An aggregator's front page has to open with something that was published
+ * today. Ours opened with a fixed article set whose newest piece was three
+ * days old and getting older every morning, because nothing rewrites it. The
+ * wire is two hours old, so the wire leads.
+ *
+ * A picture is preferred but not required: about half of wire items carry one,
+ * and a recent headline with no image beats a good-looking stale one. Age wins
+ * over decoration, so the search widens rather than reaching further back.
+ */
+export async function getWireLead(): Promise<WireCardItem | null> {
+  const recent = await getWire({ take: 40 });
+  return recent.find((i) => i.imageUrl) ?? recent[0] ?? null;
+}
+
+/**
+ * The freshest wire items for each country, for the four-country blocks.
+ *
+ * One query rather than four, because the blocks are rendered together and
+ * four round trips to Neon on every homepage request is a waste of the
+ * connection pool.
+ */
+export async function getWireByCountry(
+  countrySlugs: string[],
+  perCountry = 5,
+): Promise<Map<string, WireCardItem[]>> {
+  const pool = await getWire({ take: 400 });
+  const out = new Map<string, WireCardItem[]>();
+  for (const slug of countrySlugs) {
+    out.set(
+      slug,
+      pool
+        .filter((i) => i.countries.some((c) => c.country.slug === slug))
+        .slice(0, perCountry),
+    );
+  }
+  return out;
 }
 
 export async function countWire(opts: { country?: string; source?: string; kind?: string } = {}) {

@@ -28,8 +28,8 @@ import {
   getVideos,
 } from "@/lib/queries";
 import { balanceByCountry, getWire, getWireFreshness } from "@/lib/wire";
-import { WireBand, WireRail } from "@/components/wire";
-import { articleHref, formatDuration } from "@/lib/format";
+import { WireBand, WireHero, WireLink, WireRail } from "@/components/wire";
+import { articleHref, formatDuration, timeAgo } from "@/lib/format";
 import { IconArrowRight, IconPlay, IconTrend } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
@@ -73,14 +73,47 @@ export default async function HomePage() {
     getCountries(),
   ]);
 
+  const countrySlugs = wireCountries.map((c) => c.slug);
+
+  // The lead takes the freshest item that has a picture; a headline from this
+  // morning with no image still beats a good-looking one from yesterday, so
+  // the search widens rather than reaching further back.
+  const wireLead = wirePool.find((i) => i.imageUrl) ?? wirePool[0] ?? null;
+
+  // Everything below claims its slice in order, so no headline appears twice.
+  const taken = new Set(wireLead ? [wireLead.id] : []);
+  const claim = (items: typeof wirePool, n: number) => {
+    const out = items.filter((i) => !taken.has(i.id)).slice(0, n);
+    for (const i of out) taken.add(i.id);
+    return out;
+  };
+
+  const wireTop = claim(wirePool, 4);
+
   // Each country is guaranteed a place on the band; the rest goes by recency.
   const wireMain = balanceByCountry(
-    wirePool,
+    wirePool.filter((i) => !taken.has(i.id)),
     11,
-    wireCountries.map((c) => c.slug),
+    countrySlugs,
   );
-  const bandIds = new Set(wireMain.map((i) => i.id));
-  const wireRail = wirePool.filter((i) => !bandIds.has(i.id)).slice(0, 5);
+  for (const i of wireMain) taken.add(i.id);
+
+  // The four country blocks run on the wire rather than on articles. They used
+  // to show our own headlines, which meant four columns of three-to-thirteen
+  // day old copy under a heading that says "latest".
+  const wireByCountry = new Map(
+    countrySlugs.map((slug) => [
+      slug,
+      wirePool
+        .filter(
+          (i) => !taken.has(i.id) && i.countries.some((c) => c.country.slug === slug),
+        )
+        .slice(0, 4),
+    ]),
+  );
+  for (const items of wireByCountry.values()) for (const i of items) taken.add(i.id);
+
+  const wireRail = claim(wirePool, 5);
 
   const [politics, business, security, culture, sports, explained] = await Promise.all([
     getByCategory("politics", { take: 4, exclude: [...usedIds] }),
@@ -106,6 +139,56 @@ export default async function HomePage() {
 
   return (
     <div className="shell py-5">
+      {/* ==================================================================
+          TODAY — the wire, at the very top.
+
+          This is the answer to a page that read as stale. Aggregation was
+          working the whole time: the wire is two hours old. But it sat below
+          a fixed set of articles whose newest piece was three days old and
+          ageing every morning, because nothing rewrites them. On an
+          aggregator the freshest thing has to be the first thing, so the wire
+          leads and our own features follow underneath.
+      ================================================================== */}
+      {wireLead && (
+        <section className="mb-9">
+          <div className="mb-4 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b-[3px] border-ink pb-2.5">
+            <h2 className="text-[1.35rem] font-extrabold tracking-[-0.02em]">Today</h2>
+            <p className="text-[0.8rem] text-ink-soft">
+              Latest from {wireFreshness.sources} newsrooms across the Horn
+            </p>
+            {wireFreshness.lastFetchedAt && (
+              <span className="flex items-center gap-1.5 text-[0.74rem] font-semibold text-ink-mute">
+                <span
+                  className="inline-block h-1.5 w-1.5 rounded-full bg-[#2f7a3f]"
+                  aria-hidden
+                />
+                Checked {timeAgo(wireFreshness.lastFetchedAt)}
+              </span>
+            )}
+            <Link
+              href="/wire"
+              className="ml-auto text-[0.74rem] font-extrabold uppercase tracking-[0.07em] text-brand hover:underline"
+            >
+              All headlines →
+            </Link>
+          </div>
+
+          <div className="grid gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1.72fr)_minmax(0,1fr)] lg:items-start">
+            <WireHero item={wireLead} />
+            <div className="space-y-4 border-t border-rule pt-4 lg:border-t-0 lg:pt-0">
+              {wireTop.map((item) => (
+                <WireLink key={item.id} item={item} showExcerpt={false} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      <SectionHead
+        title="Features & Background"
+        note="Explainers and longer reads from Hornafrika"
+      />
+
       {/* ==================================================================
           THE TOP BAND — hero, the three secondaries, and Trending, as one
           grid row so all three columns share a height and bottom-align.
@@ -152,18 +235,9 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ------------------------------------------------------------------
-          The Wire, directly under the top band.
-
-          It sits this high deliberately. Our own article count is fixed and
-          the hero does not change on its own, so without the wire near the top
-          a reader returning the same afternoon sees an identical front page.
-          The wire turns over every couple of hours and is what makes the site
-          worth reloading — it should not be eleventh on the page.
-
-          It stays visually separate from our own cards, per the wire rules in
-          components/wire.tsx: no images, outlet name first, links out.
-      ------------------------------------------------------------------ */}
+      {/* More of the wire, below the features. The lead band is at the top of
+          the page; this is the wider spread, balanced across the four
+          countries. */}
       <WireBand
         items={wireMain}
         lastFetchedAt={wireFreshness.lastFetchedAt}
@@ -224,6 +298,41 @@ export default async function HomePage() {
                     <BulletItem key={a.id} article={a} />
                   ))}
                 </ul>
+
+                {/* Today's headlines for this country, from the wire.
+                    Without these the block is three-to-thirteen day old copy
+                    under a heading that promises the latest. Kept visually
+                    distinct from our own bullets above — outlet named, links
+                    out — so the two are never confused. */}
+                {(wireByCountry.get(country.slug)?.length ?? 0) > 0 && (
+                  <div className="border-t border-rule bg-shell px-3 py-3">
+                    <p className="mb-2 text-[0.62rem] font-extrabold uppercase tracking-[0.1em] text-ink-mute">
+                      Today on the wire
+                    </p>
+                    <ul className="space-y-2.5">
+                      {wireByCountry.get(country.slug)!.map((item) => (
+                        <li key={item.id}>
+                          <a
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="group block"
+                          >
+                            <span className="block text-[0.6rem] font-extrabold uppercase tracking-[0.07em] text-ink-mute">
+                              {item.source.name} · {timeAgo(item.publishedAt)}
+                            </span>
+                            <span className="clamp-2 block text-[0.8rem] font-semibold leading-[1.3] group-hover:text-brand">
+                              {item.title}
+                              <span className="ml-1 text-[0.66rem] font-normal text-ink-mute" aria-hidden>
+                                ↗
+                              </span>
+                            </span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
                 <div className="border-t border-rule px-3 py-2.5">
                   <Link
