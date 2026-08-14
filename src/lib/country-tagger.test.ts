@@ -153,4 +153,53 @@ describe("detectCountries() — tagging by text, never by publisher", () => {
     const b = detectCountries("Somalia and Eritrea");
     expect(a).toEqual(b);
   });
+
+  /**
+   * Real headlines from a live pull that the tagger dropped because it knew
+   * country names but not the places inside them. Humanitarian and local
+   * reporting is written for readers who already know where Badhan is, so the
+   * country is simply never named.
+   */
+  describe("place names, country unnamed", () => {
+    const cases: [string, string[]][] = [
+      ["Community awareness jobs are cut across Galkayo IDP camps", ["somalia"]],
+      ["New road brings trade and income to small community in Badhan", ["somalia"]],
+      ["Clashes reported in Las Anod as talks stall", ["somalia"]],
+      ["Water trucking reaches villages in Sanaag and Sool", ["somalia"]],
+      ["Conscripts report to Sawa for the new intake", ["eritrea"]],
+      ["Fuel shortages reported in Barentu and Tesseney", ["eritrea"]],
+      ["Port upgrade works begin at Damerjog", ["djibouti"]],
+      ["Fighting spreads across Wollega and Gojjam", ["ethiopia"]],
+      ["Aid convoys reach Humera and Adigrat", ["ethiopia"]],
+    ];
+
+    for (const [headline, expected] of cases) {
+      it(`tags "${headline.slice(0, 44)}…"`, () => {
+        expect(detectCountries(headline)).toEqual(expected);
+      });
+    }
+  });
+
+  /**
+   * The other half of the gazetteer decision. These are genuine Horn place
+   * names left out on purpose because they collide with words the
+   * international wires publish every day. A confidently wrong country page is
+   * worse than an item that stays on the general wire.
+   */
+  describe("ambiguous place names stay out", () => {
+    it("does not read an Italian city or an English noun as Somalia", () => {
+      expect(detectCountries("Ferry services resume at the port of Bari")).toEqual([]);
+      expect(detectCountries("The bay was closed to shipping")).toEqual([]);
+    });
+
+    it("does not read the capital of South Sudan as Somalia", () => {
+      expect(detectCountries("Peace talks continue in Juba")).toEqual([]);
+    });
+
+    it("does not read a footballer or an English word as Ethiopia", () => {
+      expect(detectCountries("Adama Traoré signs a new contract")).toEqual([]);
+      expect(detectCountries("Another bale of cotton was seized")).toEqual([]);
+      expect(detectCountries("A shire horse won the county show")).toEqual([]);
+    });
+  });
 });

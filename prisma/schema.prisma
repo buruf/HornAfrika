@@ -449,6 +449,14 @@ model Source {
   lastItemCount Int       @default(0)
   failureCount  Int       @default(0)
 
+  // Publication date of the newest item this feed has ever offered us.
+  //
+  // Fetch health and editorial health are different things. Halbeeg answered
+  // 200 with ten well-formed items on every run while its newest story was 591
+  // days old — "ok" by every check we had, and contributing nothing. Without
+  // this, an abandoned feed is indistinguishable from a quiet one.
+  lastItemAt DateTime?
+
   country Country?   @relation(fields: [countryId], references: [id], onDelete: SetNull)
   items   WireItem[]
 

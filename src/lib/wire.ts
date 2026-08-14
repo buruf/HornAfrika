@@ -19,6 +19,12 @@ export const wireSelect = {
       stateAffiliated: true,
     },
   },
+  // Which of the four an item is about. Shown as a chip on the wire band so a
+  // reader can see at a glance that the page covers four countries and not
+  // just the one that happens to publish most.
+  countries: {
+    select: { country: { select: { slug: true, name: true } } },
+  },
 } satisfies Prisma.WireItemSelect;
 
 export type WireCardItem = Prisma.WireItemGetPayload<{ select: typeof wireSelect }>;
@@ -61,8 +67,9 @@ export async function getWire(opts: {
   country?: string;
   source?: string;
   kind?: string;
+  excludeIds?: string[];
 } = {}) {
-  const { take = 30, skip = 0, country, source, kind } = opts;
+  const { take = 30, skip = 0, country, source, kind, excludeIds } = opts;
   return db.wireItem.findMany({
     where: {
       ...visible,
@@ -70,12 +77,68 @@ export async function getWire(opts: {
       ...(country ? { countries: { some: { country: { slug: country } } } } : {}),
       ...(source ? { source: { slug: source } } : {}),
       ...(kind ? { source: { kind: kind as never } } : {}),
+      ...(excludeIds?.length ? { id: { notIn: excludeIds } } : {}),
     },
     orderBy: { publishedAt: "desc" },
     take,
     skip,
     select: wireSelect,
   });
+}
+
+/**
+ * Reserve a slot on the front-page band for each country, then fill the rest
+ * by recency.
+ *
+ * Sorting the band purely by publication time makes it a Somalia page. That is
+ * not editorial judgement, it is arithmetic: Somali outlets are the most
+ * numerous and the most prolific in the source list, so on a straight recency
+ * sort the newest eleven items were all Somalia. A reader landing on a site
+ * that claims four countries saw one.
+ *
+ * So each country gets its freshest item first — an eleven-item band spends
+ * four slots guaranteeing the Horn is actually represented — and the remaining
+ * seven go to whatever is newest overall. A country with nothing recent simply
+ * forfeits its slot rather than holding a stale item on the front page.
+ *
+ * Pure, so the rule can be tested without a database.
+ */
+export function balanceByCountry<
+  T extends { id: string; publishedAt: Date; countries: { country: { slug: string } }[] },
+>(items: T[], take: number, countrySlugs: string[]): T[] {
+  const byRecency = [...items].sort(
+    (a, b) => b.publishedAt.getTime() - a.publishedAt.getTime(),
+  );
+
+  const picked = new Map<string, T>();
+
+  for (const slug of countrySlugs) {
+    if (picked.size >= take) break;
+    const freshest = byRecency.find(
+      (i) => !picked.has(i.id) && i.countries.some((c) => c.country.slug === slug),
+    );
+    if (freshest) picked.set(freshest.id, freshest);
+  }
+
+  for (const item of byRecency) {
+    if (picked.size >= take) break;
+    if (!picked.has(item.id)) picked.set(item.id, item);
+  }
+
+  // Reads as a wire, so it goes back into time order once the mix is settled.
+  return [...picked.values()].sort(
+    (a, b) => b.publishedAt.getTime() - a.publishedAt.getTime(),
+  );
+}
+
+/**
+ * The front-page band: a pool of recent items, balanced across the four
+ * countries. The pool is deliberately much larger than the band so a country
+ * that has been quiet for a few hours can still be found.
+ */
+export async function getWireBand(take = 11, countrySlugs: string[]) {
+  const pool = await getWire({ take: 120 });
+  return balanceByCountry(pool, take, countrySlugs);
 }
 
 export async function countWire(opts: { country?: string; source?: string; kind?: string } = {}) {

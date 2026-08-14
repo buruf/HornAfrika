@@ -28,7 +28,9 @@ export const SOURCES: SeedSource[] = [
   // ---------------------------------------------------------------- Somalia
   { slug: "somali-guardian", name: "Somali Guardian", homepageUrl: "https://somaliguardian.com", feedUrl: "https://somaliguardian.com/feed/", kind: "REGIONAL", country: "somalia", active: true },
   { slug: "radio-dalsan", name: "Radio Dalsan", homepageUrl: "https://radiodalsan.com", feedUrl: "https://radiodalsan.com/feed/", kind: "REGIONAL", country: "somalia", active: true },
-  { slug: "halbeeg", name: "Halbeeg News", homepageUrl: "https://en.halbeeg.com", feedUrl: "https://en.halbeeg.com/feed/", kind: "REGIONAL", country: "somalia", active: true },
+  { slug: "goobjoog", name: "Goobjoog English", homepageUrl: "https://goobjoog.com/english/", feedUrl: "https://goobjoog.com/english/feed/", kind: "REGIONAL", country: "somalia", active: true },
+  { slug: "somali-dispatch", name: "Somali Dispatch", homepageUrl: "https://www.somalidispatch.com", feedUrl: "https://www.somalidispatch.com/feed/", kind: "REGIONAL", country: "somalia", active: true },
+  { slug: "halbeeg", name: "Halbeeg News", homepageUrl: "https://en.halbeeg.com", feedUrl: "https://en.halbeeg.com/feed/", kind: "REGIONAL", country: "somalia", active: false, note: "Feed answers 200 with well-formed items, but the newest is from Jan 2025 — the outlet appears to have stopped publishing. Re-enable if it resumes." },
   { slug: "caasimada", name: "Caasimada Online", homepageUrl: "https://caasimada.net", feedUrl: "https://caasimada.net/feed/", kind: "REGIONAL", country: "somalia", language: "so", active: true },
   { slug: "jowhar", name: "Jowhar", homepageUrl: "https://jowhar.com", feedUrl: "https://jowhar.com/feed/", kind: "REGIONAL", country: "somalia", active: true },
   { slug: "puntland-post", name: "Puntland Post", homepageUrl: "https://puntlandpost.net", feedUrl: "https://puntlandpost.net/feed/", kind: "REGIONAL", country: "somalia", active: true },
@@ -54,15 +56,21 @@ export const SOURCES: SeedSource[] = [
   { slug: "adds-dj", name: "ADDS Djibouti", homepageUrl: "https://www.adds.dj", feedUrl: "https://www.adds.dj/feed/", kind: "REGIONAL", country: "djibouti", language: "fr", active: true, stateAffiliated: true },
 
   // ---------------------------------------------------------------- Eritrea
-  // No Eritrean outlet was found publishing an accessible feed. Coverage of
-  // Eritrea therefore arrives through the international and pan-African wires,
-  // country-tagged from the text of each item.
-  { slug: "shabait", name: "Shabait (Eritrea Ministry of Information)", homepageUrl: "https://shabait.com", feedUrl: "https://shabait.com/feed/", kind: "REGIONAL", country: "eritrea", active: false, stateAffiliated: true, note: "Blocks automated requests (HTTP 403). State outlet — if enabled, label it as such for readers." },
+  // Eritrea is by far the hardest of the four to source. The state outlet
+  // blocks bots, there is no independent press inside the country, and the
+  // diaspora sites are intermittent. Eritrea Focus was the only feed found on
+  // 13 Aug 2026 that is both reachable and currently publishing — and it is an
+  // advocacy group, not a newsroom, so it is noted as such rather than passed
+  // off as neutral. Most Eritrea coverage still arrives through the
+  // international wires, country-tagged from the text of each item.
+  { slug: "eritrea-focus", name: "Eritrea Focus", homepageUrl: "https://eritrea-focus.org", feedUrl: "https://eritrea-focus.org/feed/", kind: "REGIONAL", country: "eritrea", active: true, note: "UK-based advocacy and monitoring group campaigning on human rights in Eritrea, not a neutral newsroom. Included because it is the only reachable, actively-publishing Eritrea-focused feed found." },
+  { slug: "shabait", name: "Shabait (Eritrea Ministry of Information)", homepageUrl: "https://shabait.com", feedUrl: "https://shabait.com/feed/", kind: "REGIONAL", country: "eritrea", active: false, stateAffiliated: true, note: "Blocks automated requests (HTTP 403), reconfirmed 13 Aug 2026. State outlet — if enabled, label it as such for readers." },
   { slug: "tesfanews", name: "TesfaNews", homepageUrl: "https://tesfanews.net", feedUrl: "https://tesfanews.net/feed/", kind: "REGIONAL", country: "eritrea", active: false, note: "Blocks automated requests (HTTP 403)." },
-  { slug: "eritrea-hub", name: "Eritrea Hub", homepageUrl: "https://eritreahub.org", feedUrl: "https://eritreahub.org/feed", kind: "REGIONAL", country: "eritrea", active: false, note: "Feed returned no parseable items. Recheck the feed URL." },
+  { slug: "eritrea-hub", name: "Eritrea Hub", homepageUrl: "https://eritreahub.org", feedUrl: "https://eritreahub.org/feed", kind: "REGIONAL", country: "eritrea", active: false, note: "Serves an HTML page at the feed path, reconfirmed 13 Aug 2026. Needs a working feed URL from the publisher." },
 
   // ------------------------------------------------------------ Horn / pan-African
   { slug: "horn-diplomat", name: "Horn Diplomat", homepageUrl: "https://www.horndiplomat.com", feedUrl: "https://www.horndiplomat.com/feed/", kind: "HORN", country: null, active: true },
+  { slug: "radio-ergo", name: "Radio Ergo", homepageUrl: "https://radioergo.org", feedUrl: "https://radioergo.org/en/feed/", kind: "HORN", country: null, active: true, note: "Humanitarian broadcaster covering drought, displacement and rural livelihoods across the Horn — reporting the commercial press largely does not carry." },
   { slug: "african-arguments", name: "African Arguments", homepageUrl: "https://africanarguments.org", feedUrl: "https://africanarguments.org/feed/", kind: "PANAFRICAN", country: null, active: true },
   { slug: "africanews", name: "Africanews", homepageUrl: "https://www.africanews.com", feedUrl: "https://www.africanews.com/feed/rss", kind: "PANAFRICAN", country: null, active: true },
 
@@ -74,6 +82,6 @@ export const SOURCES: SeedSource[] = [
   { slug: "guardian-world", name: "The Guardian — World", homepageUrl: "https://www.theguardian.com/world", feedUrl: "https://www.theguardian.com/world/rss", kind: "INTERNATIONAL", country: null, active: true },
   { slug: "france24-africa", name: "France 24 — Africa", homepageUrl: "https://www.france24.com/en/africa/", feedUrl: "https://www.france24.com/en/africa/rss", kind: "INTERNATIONAL", country: null, active: true },
   { slug: "dw-africa", name: "DW — Africa", homepageUrl: "https://www.dw.com/en/africa/s-12756", feedUrl: "https://rss.dw.com/rdf/rss-en-africa", kind: "INTERNATIONAL", country: null, active: true },
-  { slug: "voa-africa", name: "VOA — Africa", homepageUrl: "https://www.voanews.com/africa", feedUrl: "https://www.voanews.com/api/zq$omekvi_", kind: "INTERNATIONAL", country: null, active: true, stateAffiliated: true, note: "US government-funded broadcaster." },
+  { slug: "voa-africa", name: "VOA — Africa", homepageUrl: "https://www.voanews.com/africa", feedUrl: "https://www.voanews.com/api/zq$omekvi_", kind: "INTERNATIONAL", country: null, active: false, stateAffiliated: true, note: "US government-funded broadcaster. Feed answers 200 but its newest item is from Mar 2025; VOA's output was cut back sharply that year. Needs a current feed URL before re-enabling." },
   { slug: "un-news-africa", name: "UN News — Africa", homepageUrl: "https://news.un.org/en/news/region/africa", feedUrl: "https://news.un.org/feed/subscribe/en/news/region/africa/feed/rss.xml", kind: "INTERNATIONAL", country: null, active: true, note: "United Nations news service." },
 ];

@@ -18,6 +18,7 @@ import {
   getAllCategories,
   getByCategory,
   getCategoryCounts,
+  getCountries,
   getCountryBlocks,
   getHomepageSlots,
   getHornRegional,
@@ -26,8 +27,8 @@ import {
   getTrending,
   getVideos,
 } from "@/lib/queries";
-import { getWire } from "@/lib/wire";
-import { WireRail, WireRow } from "@/components/wire";
+import { balanceByCountry, getWire, getWireFreshness } from "@/lib/wire";
+import { WireBand, WireRail } from "@/components/wire";
 import { articleHref, formatDuration } from "@/lib/format";
 import { IconArrowRight, IconPlay, IconTrend } from "@/components/icons";
 
@@ -51,8 +52,9 @@ export default async function HomePage() {
     counts,
     videos,
     slots,
-    wireMain,
-    wireRail,
+    wirePool,
+    wireFreshness,
+    wireCountries,
   ] = await Promise.all([
     getTrending("week", 5),
     getCountryBlocks([...usedIds]),
@@ -62,12 +64,23 @@ export default async function HomePage() {
     getCategoryCounts(),
     getVideos(4),
     getHomepageSlots(),
-    // The wire's main home is a full-width band of three columns.
-    getWire({ take: 12 }),
-    // A different slice for the sidebar rail, so the same headline never
-    // appears twice on one page.
-    getWire({ take: 5, skip: 12 }),
+    // One pool serves both the band and the sidebar rail. Fetching it once and
+    // splitting it here is what lets the rail exclude whatever the band chose,
+    // which a second `skip`-based query could not do once the band stopped
+    // being a straight recency slice.
+    getWire({ take: 120 }),
+    getWireFreshness(),
+    getCountries(),
   ]);
+
+  // Each country is guaranteed a place on the band; the rest goes by recency.
+  const wireMain = balanceByCountry(
+    wirePool,
+    11,
+    wireCountries.map((c) => c.slug),
+  );
+  const bandIds = new Set(wireMain.map((i) => i.id));
+  const wireRail = wirePool.filter((i) => !bandIds.has(i.id)).slice(0, 5);
 
   const [politics, business, security, culture, sports, explained] = await Promise.all([
     getByCategory("politics", { take: 4, exclude: [...usedIds] }),
@@ -138,6 +151,24 @@ export default async function HomePage() {
           </Link>
         </div>
       </section>
+
+      {/* ------------------------------------------------------------------
+          The Wire, directly under the top band.
+
+          It sits this high deliberately. Our own article count is fixed and
+          the hero does not change on its own, so without the wire near the top
+          a reader returning the same afternoon sees an identical front page.
+          The wire turns over every couple of hours and is what makes the site
+          worth reloading — it should not be eleventh on the page.
+
+          It stays visually separate from our own cards, per the wire rules in
+          components/wire.tsx: no images, outlet name first, links out.
+      ------------------------------------------------------------------ */}
+      <WireBand
+        items={wireMain}
+        lastFetchedAt={wireFreshness.lastFetchedAt}
+        sourceCount={wireFreshness.sources}
+      />
 
       {/* ==================================================================
           Below the band: one main column and one continuous sidebar.
@@ -393,37 +424,8 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ------------------------------------------------------------------
-          The Wire — aggregated, always separated from our own reporting
-      ------------------------------------------------------------------ */}
-      {wireMain.length > 0 && (
-        <section className="mt-10">
-          <SectionHead
-            title="The Wire"
-            note="Headlines from other newsrooms — links open at the publisher"
-            href="/wire"
-          />
-          <div className="grid gap-x-9 md:grid-cols-2 xl:grid-cols-3">
-            {[0, 1, 2].map((col) => {
-              const slice = wireMain.slice(col * 4, col * 4 + 4);
-              if (slice.length === 0) return null;
-              return (
-                <div key={col} className="border-t border-rule">
-                  {slice.map((item) => (
-                    <WireRow key={item.id} item={item} />
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-          <Link
-            href="/wire/about"
-            className="mt-3 inline-block text-[0.78rem] font-semibold text-ink-mute hover:text-brand"
-          >
-            How the wire works, and why these are not our stories →
-          </Link>
-        </section>
-      )}
+      {/* The Wire used to sit here, eleventh on the page. It now runs directly
+          under the top band — see the note there. */}
 
       {/* ------------------------------------------------------------------
           Top stories & categories tile strip

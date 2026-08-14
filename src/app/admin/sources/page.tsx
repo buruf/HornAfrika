@@ -4,6 +4,12 @@ import { db } from "@/lib/db";
 import { getSession, can } from "@/lib/auth";
 import { formatDateTime, timeAgo } from "@/lib/format";
 import {
+  HEALTH_LABEL,
+  HEALTH_NOTE,
+  sourceHealth,
+  type SourceHealth,
+} from "@/lib/source-health";
+import {
   addSource,
   deleteSource,
   fetchNow,
@@ -13,6 +19,16 @@ import {
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Wire sources" };
+
+const HEALTH_COLOUR: Record<SourceHealth, string> = {
+  ok: "#2f7a3f",
+  quiet: "#5c6b78",
+  stale: "#a8730f",
+  abandoned: "#8a1020",
+  failing: "#a8730f",
+  broken: "#8a1020",
+  unknown: "#5c6b78",
+};
 
 const KINDS = ["REGIONAL", "HORN", "PANAFRICAN", "INTERNATIONAL"] as const;
 
@@ -56,6 +72,14 @@ export default async function SourcesPage({
 
   const active = sources.filter((s) => s.active);
   const failing = active.filter((s) => s.failureCount > 0);
+
+  // Reachability and freshness are different failures. A feed can answer 200
+  // with ten tidy items for months after the newsroom behind it stopped.
+  const healthOf = new Map(sources.map((s) => [s.id, sourceHealth(s)]));
+  const stalled = active.filter((s) => {
+    const h = healthOf.get(s.id)!;
+    return h === "stale" || h === "abandoned";
+  });
 
   const input =
     "w-full border border-rule-strong bg-white px-3 py-2 text-[0.86rem] outline-none focus:border-ink";
@@ -126,6 +150,27 @@ export default async function SourcesPage({
         </div>
       )}
 
+      {stalled.length > 0 && (
+        <div className="mt-4 border-l-[3px] border-[#8a1020] bg-[#fdf0f1] px-4 py-3">
+          <p className="text-[0.86rem] font-bold text-[#8a1020]">
+            {stalled.length} active {stalled.length === 1 ? "source is" : "sources are"}{" "}
+            reachable but no longer publishing
+          </p>
+          <p className="mt-0.5 text-[0.8rem] text-[#8a1020]">
+            These fetch cleanly, so nothing looks wrong, but nothing new is
+            arriving from them either.
+          </p>
+          <ul className="mt-1 space-y-0.5 text-[0.83rem] text-[#8a1020]">
+            {stalled.map((s) => (
+              <li key={s.id}>
+                {s.name} — newest item{" "}
+                {s.lastItemAt ? timeAgo(s.lastItemAt) : "unknown"}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="mt-7 grid gap-8 lg:grid-cols-[minmax(0,1fr)_330px]">
         <div className="space-y-3">
           {sources.map((s) => (
@@ -170,14 +215,16 @@ export default async function SourcesPage({
                   <>
                     <span
                       className="font-bold"
-                      style={{ color: s.lastStatus === "ok" ? "#2f7a3f" : "#a8730f" }}
+                      style={{ color: HEALTH_COLOUR[healthOf.get(s.id)!] }}
+                      title={HEALTH_NOTE[healthOf.get(s.id)!]}
                     >
-                      {s.lastStatus}
+                      {HEALTH_LABEL[healthOf.get(s.id)!]}
                     </span>
                     <span className="text-ink-mute">
                       {" "}
-                      · last checked {timeAgo(s.lastFetchedAt)} · {s.lastItemCount} items in
-                      feed
+                      · fetch {s.lastStatus} {timeAgo(s.lastFetchedAt)} ·{" "}
+                      {s.lastItemCount} items in feed · newest{" "}
+                      {s.lastItemAt ? timeAgo(s.lastItemAt) : "undated"}
                     </span>
                   </>
                 ) : (

@@ -174,6 +174,111 @@ export function WireNotice({ compact = false }: { compact?: boolean }) {
   );
 }
 
+/** The four-country chips shown on the wire band. */
+function CountryChips({ item }: { item: WireCardItem }) {
+  if (item.countries.length === 0) return null;
+  return (
+    <>
+      {item.countries.map(({ country }) => (
+        <Link
+          key={country.slug}
+          href={`/${country.slug}`}
+          className="border border-rule px-1.5 py-px text-[0.58rem] font-extrabold uppercase tracking-[0.06em] text-ink-mute transition-colors hover:border-brand hover:text-brand"
+        >
+          {country.name}
+        </Link>
+      ))}
+    </>
+  );
+}
+
+/**
+ * The wire's front-page band.
+ *
+ * This sits high on the homepage because it is the only part of the front page
+ * that moves. Our own article count is fixed; the wire turns over every couple
+ * of hours, and a reader arriving twice in a day should be able to see that.
+ * Hence the freshness line in the header — it is the page saying, checkably,
+ * that it is current.
+ */
+export function WireBand({
+  items,
+  lastFetchedAt,
+  sourceCount,
+}: {
+  items: WireCardItem[];
+  lastFetchedAt: Date | null;
+  sourceCount: number;
+}) {
+  if (items.length === 0) return null;
+
+  const [lead, ...rest] = items;
+
+  return (
+    <section className="mt-9 border-t-[3px] border-ink pt-4">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <h2 className="text-[1.35rem] font-extrabold tracking-[-0.02em]">The Wire</h2>
+        <p className="text-[0.8rem] text-ink-soft">
+          Headlines from {sourceCount} newsrooms across the Horn and beyond
+        </p>
+        {lastFetchedAt && (
+          <span className="flex items-center gap-1.5 text-[0.74rem] font-semibold text-ink-mute">
+            <span
+              className="inline-block h-1.5 w-1.5 rounded-full bg-[#2f7a3f]"
+              aria-hidden
+            />
+            Updated {timeAgo(lastFetchedAt)}
+          </span>
+        )}
+        <Link
+          href="/wire"
+          className="ml-auto text-[0.74rem] font-extrabold uppercase tracking-[0.07em] text-brand hover:underline"
+        >
+          All headlines →
+        </Link>
+      </div>
+
+      <div className="mt-4 grid gap-x-8 gap-y-5 md:grid-cols-2 xl:grid-cols-4">
+        {/* The newest item is given the excerpt; the rest are headline-only so
+            four columns stay level and scannable. */}
+        <div className="border-t-2 border-brand pt-3">
+          <WireLink item={lead} />
+          <div className="mt-4 space-y-4 border-t border-rule pt-4">
+            {rest.slice(0, 2).map((item) => (
+              <WireLink key={item.id} item={item} showExcerpt={false} />
+            ))}
+          </div>
+        </div>
+
+        {[0, 1, 2].map((col) => {
+          const slice = rest.slice(2 + col * 3, 2 + col * 3 + 3);
+          if (slice.length === 0) return null;
+          return (
+            <div key={col} className="space-y-4 border-t border-rule pt-3">
+              {slice.map((item) => (
+                <div key={item.id}>
+                  <WireLink item={item} showExcerpt={false} />
+                  <div className="mt-1.5 flex flex-wrap gap-1.5 pl-3">
+                    <CountryChips item={item} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+
+      <p className="mt-4 border-t border-rule pt-3 text-[0.76rem] leading-relaxed text-ink-mute">
+        Each headline and extract above is the work of the newsroom credited
+        beside it and remains its copyright; we link out rather than reproduce.{" "}
+        <Link href="/wire/about" className="font-semibold text-brand hover:underline">
+          How the wire works
+        </Link>
+      </p>
+    </section>
+  );
+}
+
 /** Sidebar/homepage rail used on the homepage and country pages. */
 export function WireRail({
   items,

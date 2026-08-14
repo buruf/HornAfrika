@@ -46,19 +46,31 @@ export { detectCountries };
 // Fetching
 // ---------------------------------------------------------------------------
 
+const FEED_ACCEPT =
+  "application/rss+xml, application/atom+xml, application/xml, text/xml, */*";
+
 async function fetchFeed(url: string): Promise<{ xml: string; status: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    const res = await fetch(url, {
-      headers: {
-        "user-agent": USER_AGENT,
-        accept: "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
-      },
+
+  const get = (accept: string) =>
+    fetch(url, {
+      headers: { "user-agent": USER_AGENT, accept },
       signal: controller.signal,
       redirect: "follow",
       cache: "no-store",
     });
+
+  try {
+    let res = await get(FEED_ACCEPT);
+
+    // Some publishers run content negotiation that rejects an explicit list of
+    // feed types even though `*/*` is in it, and answer 406 to a request they
+    // would happily serve. Asking less specifically is not evasion — it is what
+    // an ordinary client sends — so one retry is worth it before recording the
+    // source as broken.
+    if (res.status === 406) res = await get("*/*");
+
     if (!res.ok) {
       const err = new Error(`HTTP ${res.status}`);
       (err as Error & { status: string }).status = `http ${res.status}`;
@@ -170,6 +182,13 @@ export async function fetchSource(
     }
   }
 
+  // Newest item the feed offered, whether or not it was new to us — that is
+  // what says the newsroom is still publishing.
+  const newest = items.reduce<Date | null>(
+    (max, it) => (!max || it.publishedAt > max ? it.publishedAt : max),
+    null,
+  );
+
   await db.source.update({
     where: { id: source.id },
     data: {
@@ -178,6 +197,7 @@ export async function fetchSource(
       lastError: null,
       lastItemCount: items.length,
       failureCount: 0,
+      ...(newest ? { lastItemAt: newest } : {}),
     },
   });
 
