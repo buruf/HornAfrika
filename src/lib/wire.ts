@@ -13,6 +13,8 @@ export const wireSelect = {
   // Used for the homepage lead; hotlinked to the publisher rather than copied,
   // which is the same posture as the headline itself.
   imageUrl: true,
+  // The desk this was filed to, or null. See topic-tagger.ts.
+  topic: true,
   source: {
     select: {
       slug: true,
@@ -65,24 +67,32 @@ const hornRelevant: Prisma.WireItemWhereInput = {
   countries: { some: {} },
 };
 
-export async function getWire(opts: {
-  take?: number;
-  skip?: number;
+type WireFilter = {
   country?: string;
   source?: string;
   kind?: string;
+  topic?: string;
   excludeIds?: string[];
-} = {}) {
-  const { take = 30, skip = 0, country, source, kind, excludeIds } = opts;
+};
+
+function wireWhere({ country, source, kind, topic, excludeIds }: WireFilter) {
+  return {
+    ...visible,
+    ...hornRelevant,
+    ...(country ? { countries: { some: { country: { slug: country } } } } : {}),
+    ...(source ? { source: { slug: source } } : {}),
+    ...(kind ? { source: { kind: kind as never } } : {}),
+    ...(topic ? { topic } : {}),
+    ...(excludeIds?.length ? { id: { notIn: excludeIds } } : {}),
+  } satisfies Prisma.WireItemWhereInput;
+}
+
+export async function getWire(
+  opts: WireFilter & { take?: number; skip?: number } = {},
+) {
+  const { take = 30, skip = 0, ...filter } = opts;
   return db.wireItem.findMany({
-    where: {
-      ...visible,
-      ...hornRelevant,
-      ...(country ? { countries: { some: { country: { slug: country } } } } : {}),
-      ...(source ? { source: { slug: source } } : {}),
-      ...(kind ? { source: { kind: kind as never } } : {}),
-      ...(excludeIds?.length ? { id: { notIn: excludeIds } } : {}),
-    },
+    where: wireWhere(filter),
     orderBy: { publishedAt: "desc" },
     take,
     skip,
@@ -91,19 +101,38 @@ export async function getWire(opts: {
 }
 
 /**
- * Reserve a slot on the front-page band for each country, then fill the rest
- * by recency.
+ * How many headlines each desk is holding, for the category strip and for
+ * deciding whether a desk is worth linking to at all.
+ */
+export async function getTopicCounts(country?: string): Promise<Map<string, number>> {
+  const rows = await db.wireItem.groupBy({
+    by: ["topic"],
+    where: wireWhere({ country }),
+    _count: true,
+  });
+  return new Map(
+    rows.filter((r) => r.topic).map((r) => [r.topic as string, r._count]),
+  );
+}
+
+/**
+ * Deal wire slots round-robin between the countries, each taking its next
+ * freshest item in turn.
  *
- * Sorting the band purely by publication time makes it a Somalia page. That is
- * not editorial judgement, it is arithmetic: Somali outlets are the most
- * numerous and the most prolific in the source list, so on a straight recency
- * sort the newest eleven items were all Somalia. A reader landing on a site
- * that claims four countries saw one.
+ * Straight recency makes this a Somalia site. That is arithmetic, not
+ * judgement: Somali outlets are the most numerous and the most prolific we can
+ * reach, so the newest eleven items were all Somalia and a platform claiming
+ * four countries showed one.
  *
- * So each country gets its freshest item first — an eleven-item band spends
- * four slots guaranteeing the Horn is actually represented — and the remaining
- * seven go to whatever is newest overall. A country with nothing recent simply
- * forfeits its slot rather than holding a stale item on the front page.
+ * Reserving one slot per country and filling the rest by recency was the first
+ * attempt, and it was not enough — Somalia simply took every unreserved slot,
+ * so eight of eleven were still Somalia. Dealing in rotation is what actually
+ * evens the page out: each country takes a turn, and a country with nothing
+ * left is skipped rather than padded, so the band degrades to whatever the
+ * supply really is instead of pretending.
+ *
+ * Any slots still open once every country is exhausted go to the freshest
+ * remaining items, tagged or not, so the band never renders short.
  *
  * Pure, so the rule can be tested without a database.
  */
@@ -114,14 +143,35 @@ export function balanceByCountry<
     (a, b) => b.publishedAt.getTime() - a.publishedAt.getTime(),
   );
 
+  // One queue per country, freshest first. An item tagged with two countries
+  // sits in both queues; whichever turn comes first claims it, and `picked`
+  // stops it being dealt twice.
+  const queues = new Map(
+    countrySlugs.map((slug) => [
+      slug,
+      byRecency.filter((i) => i.countries.some((c) => c.country.slug === slug)),
+    ]),
+  );
+  const cursor = new Map(countrySlugs.map((slug) => [slug, 0]));
   const picked = new Map<string, T>();
 
-  for (const slug of countrySlugs) {
-    if (picked.size >= take) break;
-    const freshest = byRecency.find(
-      (i) => !picked.has(i.id) && i.countries.some((c) => c.country.slug === slug),
-    );
-    if (freshest) picked.set(freshest.id, freshest);
+  let dealt = true;
+  while (picked.size < take && dealt) {
+    dealt = false;
+    for (const slug of countrySlugs) {
+      if (picked.size >= take) break;
+
+      const queue = queues.get(slug)!;
+      let at = cursor.get(slug)!;
+      while (at < queue.length && picked.has(queue[at].id)) at++;
+      cursor.set(slug, at);
+
+      if (at < queue.length) {
+        picked.set(queue[at].id, queue[at]);
+        cursor.set(slug, at + 1);
+        dealt = true;
+      }
+    }
   }
 
   for (const item of byRecency) {
@@ -186,17 +236,8 @@ export async function getWireByCountry(
   return out;
 }
 
-export async function countWire(opts: { country?: string; source?: string; kind?: string } = {}) {
-  const { country, source, kind } = opts;
-  return db.wireItem.count({
-    where: {
-      ...visible,
-      ...hornRelevant,
-      ...(country ? { countries: { some: { country: { slug: country } } } } : {}),
-      ...(source ? { source: { slug: source } } : {}),
-      ...(kind ? { source: { kind: kind as never } } : {}),
-    },
-  });
+export async function countWire(opts: WireFilter = {}) {
+  return db.wireItem.count({ where: wireWhere(opts) });
 }
 
 export const getWireSources = cache(async () =>

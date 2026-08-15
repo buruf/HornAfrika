@@ -40,22 +40,53 @@ describe("balanceByCountry", () => {
     }
   });
 
-  it("still fills the rest of the band with the freshest items", () => {
+  /**
+   * Reserving one slot per country was not enough: Somalia took every
+   * unreserved slot and eight of eleven were still Somalia. Dealing in
+   * rotation is what actually evens it out.
+   */
+  it("deals in rotation instead of letting one country take the remainder", () => {
+    const pool = [
+      ...Array.from({ length: 20 }, (_, i) => item(`som-${i}`, i, "somalia")),
+      ...Array.from({ length: 6 }, (_, i) => item(`eth-${i}`, 30 + i, "ethiopia")),
+      ...Array.from({ length: 6 }, (_, i) => item(`dji-${i}`, 40 + i, "djibouti")),
+      ...Array.from({ length: 6 }, (_, i) => item(`eri-${i}`, 50 + i, "eritrea")),
+    ];
+
+    const band = balanceByCountry(pool, 12, COUNTRIES);
+    const counts = COUNTRIES.map(
+      (slug) => slugsOf(band).filter((s) => s === slug).length,
+    );
+
+    // Twelve slots, four countries with plenty each: three apiece.
+    expect(counts).toEqual([3, 3, 3, 3]);
+  });
+
+  it("takes each country's freshest first", () => {
+    const pool = [
+      ...Array.from({ length: 20 }, (_, i) => item(`som-${i}`, i, "somalia")),
+      ...Array.from({ length: 6 }, (_, i) => item(`eth-${i}`, 30 + i, "ethiopia")),
+    ];
+    const ids = balanceByCountry(pool, 4, COUNTRIES).map((b) => b.id);
+    expect(ids).toContain("som-0");
+    expect(ids).toContain("eth-0");
+    expect(ids).not.toContain("som-5");
+    expect(ids).not.toContain("eth-5");
+  });
+
+  it("gives spare slots to whoever still has items", () => {
+    // Somalia is deep, the others have one each. Somalia should absorb the
+    // remainder rather than the band rendering short.
     const pool = [
       ...Array.from({ length: 20 }, (_, i) => item(`som-${i}`, i, "somalia")),
       item("eth-1", 30, "ethiopia"),
       item("dji-1", 40, "djibouti"),
       item("eri-1", 50, "eritrea"),
     ];
-
     const band = balanceByCountry(pool, 11, COUNTRIES);
-    const ids = band.map((b) => b.id);
-
-    // Seven slots remain after the four reserved ones, and they go to the
-    // newest Somalia items rather than to anything older.
-    expect(ids).toContain("som-0");
-    expect(ids).toContain("som-6");
-    expect(ids).not.toContain("som-19");
+    expect(band).toHaveLength(11);
+    expect(slugsOf(band).filter((s) => s === "somalia")).toHaveLength(8);
+    for (const slug of COUNTRIES) expect(slugsOf(band)).toContain(slug);
   });
 
   it("returns the band in time order", () => {

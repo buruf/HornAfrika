@@ -73,6 +73,10 @@ export default async function HomePage() {
     getCountries(),
   ]);
 
+  // Do we hold any of our own published writing at all? Everything in the
+  // features half of the page hangs off this.
+  const hasFeatures = Boolean(lead) || secondaries.length > 0;
+
   const countrySlugs = wireCountries.map((c) => c.slug);
 
   // The lead takes the freshest item that has a picture; a headline from this
@@ -115,18 +119,17 @@ export default async function HomePage() {
 
   const wireRail = claim(wirePool, 5);
 
-  const [politics, business, security, culture, sports, explained] = await Promise.all([
-    getByCategory("politics", { take: 4, exclude: [...usedIds] }),
-    getByCategory("business", { take: 4, exclude: [...usedIds] }),
-    getByCategory("security", { take: 3, exclude: [...usedIds] }),
-    getByCategory("culture", { take: 3, exclude: [...usedIds] }),
-    getByCategory("sports", { take: 3, exclude: [...usedIds] }),
-    getByCategory("explained", { take: 4, exclude: [...usedIds] }),
-  ]);
-
-  const peopleFeature = slots.get("people-feature");
-  // Wider now that Latest sits in the main column across two or three columns.
-  const latestColumn = latest.filter((a) => !usedIds.has(a.id)).slice(0, 9);
+  // Desk rows, drawn from the same pool. A desk with nothing left after the
+  // bands above have taken their share is dropped rather than shown empty.
+  const deskSections = categories
+    .filter((c) => c.kind === "DESK")
+    .map((c) => ({
+      slug: c.slug,
+      name: c.name,
+      items: wirePool.filter((i) => !taken.has(i.id) && i.topic === c.slug).slice(0, 4),
+    }))
+    .filter((d) => d.items.length >= 2);
+  for (const d of deskSections) for (const i of d.items) taken.add(i.id);
 
   const categoryTiles = categories
     // The regional desk already has its own landing page and sidebar panel.
@@ -184,10 +187,19 @@ export default async function HomePage() {
         </section>
       )}
 
-      <SectionHead
-        title="Features & Background"
-        note="Explainers and longer reads from Hornafrika"
-      />
+      {/* Our own writing, when there is any.
+
+          Everything here is conditional on articles existing. The launch
+          articles have been retired, so today this renders nothing at all —
+          and that is the honest state of a site with no reporters yet. The
+          moment a verified contributor files something and an editor
+          publishes it, this section comes back on its own. */}
+      {hasFeatures && (
+        <SectionHead
+          title="Features & Background"
+          note="Reporting and explainers from Hornafrika"
+        />
+      )}
 
       {/* ==================================================================
           THE TOP BAND — hero, the three secondaries, and Trending, as one
@@ -204,6 +216,7 @@ export default async function HomePage() {
           (1.72fr + gap + 1fr) === the main column there — so the sidebar
           edge lines up straight down the page.
       ================================================================== */}
+      {hasFeatures && (
       <section className="grid gap-5 md:grid-cols-[minmax(0,1.72fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1.72fr)_minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1.72fr)_minmax(0,1fr)_340px]">
         {lead && <HeroCard article={lead} fill />}
 
@@ -234,6 +247,7 @@ export default async function HomePage() {
           </Link>
         </div>
       </section>
+      )}
 
       {/* More of the wire, below the features. The lead band is at the top of
           the page; this is the wider spread, balanced across the four
@@ -292,12 +306,14 @@ export default async function HomePage() {
                   </Link>
                 )}
 
-                <ul className="space-y-2 px-3 py-3">
-                  {cLead && <BulletItem article={cLead} />}
-                  {rest.map((a) => (
-                    <BulletItem key={a.id} article={a} />
-                  ))}
-                </ul>
+                {(cLead || rest.length > 0) && (
+                  <ul className="space-y-2 px-3 py-3">
+                    {cLead && <BulletItem article={cLead} />}
+                    {rest.map((a) => (
+                      <BulletItem key={a.id} article={a} />
+                    ))}
+                  </ul>
+                )}
 
                 {/* Today's headlines for this country, from the wire.
                     Without these the block is three-to-thirteen day old copy
@@ -350,6 +366,7 @@ export default async function HomePage() {
           </section>
 
           {/* ------------------------------------------------ Horn regional */}
+          {horn.length > 0 && (
           <section>
             <SectionHead
               title="Horn of Africa"
@@ -367,6 +384,7 @@ export default async function HomePage() {
               </div>
             )}
           </section>
+          )}
 
         </div>
 
@@ -413,85 +431,34 @@ export default async function HomePage() {
         </aside>
       </div>
 
-      {/* -------------------------------------------------------------- Latest
-          Full width, directly beneath the two-column block. Kept out of the
-          grid deliberately: it lets the main column and the sidebar finish at
-          close to the same point, so neither leaves a hole beside the other. */}
-      <section className="mt-9">
-        <SectionHead title="Latest" href="/latest" hrefLabel="All" light />
-        <div className="grid gap-x-8 sm:grid-cols-2 lg:grid-cols-3">
-          {latestColumn.map((a) => (
-            <TextItem key={a.id} article={a} />
-          ))}
-        </div>
-      </section>
-
       <AdSlot position="homepage-mid" className="mt-9" />
 
       {/* ------------------------------------------------------------------
-          Desk sections. Weight differs deliberately (spec §29): Politics and
-          Business get four cards, Security/Culture/Sports share a row.
+          Desk sections, from the wire.
+
+          These used to be our own articles. The desk each headline belongs on
+          is inferred from its text (see topic-tagger.ts) — imperfect, and
+          about a third of items get no desk at all, which is why they simply
+          do not appear here rather than being forced onto a desk.
+
+          A desk with nothing recent is skipped entirely: an empty heading is
+          worse than a shorter page.
       ------------------------------------------------------------------ */}
-      <section className="mt-10">
-        <SectionHead title="Politics" href="/politics" />
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {politics.map((a) => (
-            <StackedCard key={a.id} article={a} />
-          ))}
-        </div>
-      </section>
-
-      <section className="mt-10">
-        <SectionHead title="Business" href="/business" />
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {business.map((a) => (
-            <StackedCard key={a.id} article={a} />
-          ))}
-        </div>
-      </section>
-
-      <section className="mt-10 grid gap-8 lg:grid-cols-3">
-        {[
-          { title: "Security", href: "/security", items: security },
-          { title: "Culture", href: "/culture", items: culture },
-          { title: "Sports", href: "/sports", items: sports },
-        ].map(({ title, href, items }) => (
-          <div key={title}>
-            <SectionHead title={title} href={href} light />
-            {items[0] && <StackedCard article={items[0]} imageHeight="h-[152px]" />}
-            <div className="mt-4 space-y-4">
-              {items.slice(1).map((a) => (
-                <RowCard key={a.id} article={a} />
-              ))}
-            </div>
-          </div>
-        ))}
-      </section>
-
-      {/* ------------------------------------------------------------------
-          Explained + People
-      ------------------------------------------------------------------ */}
-      <section className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <div>
+      {deskSections.map(({ slug, name, items }) => (
+        <section key={slug} className="mt-10">
           <SectionHead
-            title="Explained"
-            note="Background and context behind the headlines"
-            href="/explained"
+            title={name}
+            href={`/${slug}`}
+            hrefLabel="All"
+            note="Headlines from other newsrooms — links open at the publisher"
           />
-          <div className="grid gap-6 sm:grid-cols-2">
-            {explained.map((a) => (
-              <StackedCard key={a.id} article={a} imageHeight="h-[150px]" />
+          <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
+            {items.map((item) => (
+              <WireLink key={item.id} item={item} showExcerpt={false} />
             ))}
           </div>
-        </div>
-
-        <div>
-          <SectionHead title="People of the Horn" href="/people" light />
-          {peopleFeature && (
-            <StackedCard article={peopleFeature} imageHeight="h-[186px]" />
-          )}
-        </div>
-      </section>
+        </section>
+      ))}
 
       {/* ------------------------------------------------------------------
           Video

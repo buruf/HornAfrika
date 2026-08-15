@@ -480,12 +480,20 @@ model WireItem {
   hidden      Boolean  @default(false) // moderator can suppress an item
   clicks      Int      @default(0)
 
+  // Which desk this belongs on — inferred from the text, see topic-tagger.ts.
+  // One desk per item, unlike countries, or every desk page becomes a copy of
+  // the wire. Null is normal: an item with no clear desk stays on the wire and
+  // its country page rather than being forced somewhere it does not belong.
+  topic String?
+
   source    Source            @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   countries WireItemCountry[]
 
   @@unique([sourceId, guid])
   @@index([publishedAt])
   @@index([hidden, publishedAt])
+  // Desk pages filter on topic and sort by date.
+  @@index([topic, publishedAt])
 }
 
 // Same idea as ArticleCountry: one wire item can be relevant to several

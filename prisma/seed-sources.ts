@@ -47,6 +47,12 @@ export const SOURCES: SeedSource[] = [
   { slug: "capital-ethiopia", name: "Capital Ethiopia", homepageUrl: "https://www.capitalethiopia.com", feedUrl: "https://www.capitalethiopia.com/feed/", kind: "REGIONAL", country: "ethiopia", active: true },
   { slug: "ethiopia-insight", name: "Ethiopia Insight", homepageUrl: "https://www.ethiopia-insight.com", feedUrl: "https://www.ethiopia-insight.com/feed/", kind: "REGIONAL", country: "ethiopia", active: true },
   { slug: "fana", name: "Fana Broadcasting", homepageUrl: "https://www.fanabc.com", feedUrl: "https://www.fanabc.com/english/feed/", kind: "REGIONAL", country: "ethiopia", active: true, stateAffiliated: true },
+  // Fana's Amharic desk carries different stories from its English one, not
+  // translations of them, and it is where domestic coverage actually lands.
+  // It also exercises the Amharic side of the country tagger.
+  { slug: "fana-amharic", name: "Fana Broadcasting (Amharic)", homepageUrl: "https://www.fanabc.com", feedUrl: "https://www.fanabc.com/feed/", kind: "REGIONAL", country: "ethiopia", language: "am", active: true, stateAffiliated: true },
+  { slug: "ethiopian-business-review", name: "Ethiopian Business Review", homepageUrl: "https://ethiopianbusinessreview.net", feedUrl: "https://ethiopianbusinessreview.net/feed/", kind: "REGIONAL", country: "ethiopia", active: true, note: "Monthly business title — expect it to read as quiet between issues." },
+  { slug: "new-business-ethiopia", name: "New Business Ethiopia", homepageUrl: "https://newbusinessethiopia.com", feedUrl: "https://newbusinessethiopia.com/feed/", kind: "REGIONAL", country: "ethiopia", active: true },
   { slug: "addis-standard", name: "Addis Standard", homepageUrl: "https://addisstandard.com", feedUrl: "https://addisstandard.com/feed/", kind: "REGIONAL", country: "ethiopia", active: false, note: "Blocks automated requests (HTTP 403). Enable only with the publisher's permission." },
   { slug: "reporter-ethiopia", name: "The Reporter Ethiopia", homepageUrl: "https://www.thereporterethiopia.com", feedUrl: "https://www.thereporterethiopia.com/feed/", kind: "REGIONAL", country: "ethiopia", active: false, note: "Blocks automated requests (HTTP 403). Enable only with the publisher's permission." },
   { slug: "borkena", name: "Borkena", homepageUrl: "https://borkena.com", feedUrl: "https://borkena.com/feed/", kind: "REGIONAL", country: "ethiopia", active: false, note: "Blocks automated requests (HTTP 403). Enable only with the publisher's permission." },
@@ -54,6 +60,7 @@ export const SOURCES: SeedSource[] = [
   // --------------------------------------------------------------- Djibouti
   { slug: "la-nation-dj", name: "La Nation", homepageUrl: "https://www.lanation.dj", feedUrl: "https://www.lanation.dj/feed/", kind: "REGIONAL", country: "djibouti", language: "fr", active: true, stateAffiliated: true },
   { slug: "adds-dj", name: "ADDS Djibouti", homepageUrl: "https://www.adds.dj", feedUrl: "https://www.adds.dj/feed/", kind: "REGIONAL", country: "djibouti", language: "fr", active: true, stateAffiliated: true },
+  { slug: "rtd-dj", name: "RTD Djibouti", homepageUrl: "https://www.rtd.dj", feedUrl: "https://www.rtd.dj/feed/", kind: "REGIONAL", country: "djibouti", language: "fr", active: true, stateAffiliated: true, note: "National broadcaster. All three working Djiboutian feeds are state-run — there is no independent press to balance them with, and readers are told so." },
 
   // ---------------------------------------------------------------- Eritrea
   // Eritrea is by far the hardest of the four to source. The state outlet
@@ -63,7 +70,8 @@ export const SOURCES: SeedSource[] = [
   // advocacy group, not a newsroom, so it is noted as such rather than passed
   // off as neutral. Most Eritrea coverage still arrives through the
   // international wires, country-tagged from the text of each item.
-  { slug: "eritrea-focus", name: "Eritrea Focus", homepageUrl: "https://eritrea-focus.org", feedUrl: "https://eritrea-focus.org/feed/", kind: "REGIONAL", country: "eritrea", active: true, note: "UK-based advocacy and monitoring group campaigning on human rights in Eritrea, not a neutral newsroom. Included because it is the only reachable, actively-publishing Eritrea-focused feed found." },
+  { slug: "eritrea-focus", name: "Eritrea Focus", homepageUrl: "https://eritrea-focus.org", feedUrl: "https://eritrea-focus.org/feed/", kind: "REGIONAL", country: "eritrea", active: true, note: "UK-based advocacy and monitoring group campaigning on human rights in Eritrea, not a neutral newsroom." },
+  { slug: "awate", name: "Awate", homepageUrl: "https://awate.com", feedUrl: "https://www.awate.com/feed/", kind: "REGIONAL", country: "eritrea", active: true, note: "Long-running Eritrean diaspora opposition site. Openly partisan against the government, and the only other reachable Eritrea feed publishing regularly. Both Eritrean sources we can reach are opposition-aligned; the state outlet blocks us. Readers should know the coverage leans one way because the other side is unreachable, not because we chose it." },
   { slug: "shabait", name: "Shabait (Eritrea Ministry of Information)", homepageUrl: "https://shabait.com", feedUrl: "https://shabait.com/feed/", kind: "REGIONAL", country: "eritrea", active: false, stateAffiliated: true, note: "Blocks automated requests (HTTP 403), reconfirmed 13 Aug 2026. State outlet — if enabled, label it as such for readers." },
   { slug: "tesfanews", name: "TesfaNews", homepageUrl: "https://tesfanews.net", feedUrl: "https://tesfanews.net/feed/", kind: "REGIONAL", country: "eritrea", active: false, note: "Blocks automated requests (HTTP 403)." },
   { slug: "eritrea-hub", name: "Eritrea Hub", homepageUrl: "https://eritreahub.org", feedUrl: "https://eritreahub.org/feed", kind: "REGIONAL", country: "eritrea", active: false, note: "Serves an HTML page at the feed path, reconfirmed 13 Aug 2026. Needs a working feed URL from the publisher." },

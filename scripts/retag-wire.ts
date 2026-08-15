@@ -15,6 +15,7 @@
 
 import { PrismaClient } from "@prisma/client";
 import { detectCountries } from "../src/lib/country-tagger";
+import { detectTopic } from "../src/lib/topic-tagger";
 
 const db = new PrismaClient();
 const APPLY = process.argv.includes("--apply");
@@ -29,10 +30,13 @@ async function main() {
       id: true,
       title: true,
       excerpt: true,
+      topic: true,
       countries: { select: { countryId: true, country: { select: { slug: true } } } },
     },
   });
 
+  const topicTally: Record<string, number> = {};
+  let topicChanged = 0;
   let gained = 0;
   let lost = 0;
   let unchanged = 0;
@@ -46,6 +50,13 @@ async function main() {
 
     const added = [...after].filter((s) => !before.has(s));
     const removed = [...before].filter((s) => !after.has(s));
+
+    const topic = detectTopic(`${item.title} ${item.excerpt}`);
+    topicTally[topic ?? "(none)"] = (topicTally[topic ?? "(none)"] ?? 0) + 1;
+    if (topic !== item.topic) {
+      topicChanged++;
+      if (APPLY) await db.wireItem.update({ where: { id: item.id }, data: { topic } });
+    }
 
     if (added.length === 0 && removed.length === 0) {
       unchanged++;
@@ -78,6 +89,13 @@ async function main() {
       }
     }
   }
+
+  console.log(`\ndesk assignment across ${items.length} items:`);
+  for (const [topic, n] of Object.entries(topicTally).sort((a, b) => b[1] - a[1])) {
+    const pct = Math.round((n / items.length) * 100);
+    console.log(`  ${String(n).padStart(4)} ${String(pct).padStart(3)}%  ${topic}`);
+  }
+  console.log(`${topicChanged} items had their desk set or changed`);
 
   console.log(
     `\n${items.length} items · ${gained} gained a tag · ${lost} lost one · ${unchanged} unchanged`,

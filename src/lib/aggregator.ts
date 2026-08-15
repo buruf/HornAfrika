@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { parseFeed, type ParsedItem } from "@/lib/rss";
 import { detectCountries } from "@/lib/country-tagger";
+import { detectTopic } from "@/lib/topic-tagger";
 
 /**
  * The wire aggregator.
@@ -149,6 +150,7 @@ export async function fetchSource(
           author: item.author ?? null,
           imageUrl: item.imageUrl ?? null,
           publishedAt: item.publishedAt,
+          topic: detectTopic(`${item.title} ${item.excerpt}`),
         },
       });
 
