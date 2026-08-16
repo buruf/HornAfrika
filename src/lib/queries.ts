@@ -87,6 +87,11 @@ export const getCountriesWithRegions = cache(
 );
 
 // The ticker sits in the layout, so this runs on literally every page.
+//
+// It is flagged by an editor, so it only ever holds our own articles — which
+// means a strip labelled "Breaking News" was showing a five-day-old headline,
+// because nothing had been flagged since. See getTickerItems for what the
+// layout actually renders.
 export const getBreaking = cache(
   cached(
     () =>

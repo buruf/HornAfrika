@@ -18,6 +18,7 @@ import {
   getAllCategories,
   getByCategory,
   getCategoryCounts,
+  getCountries,
   getCountryBlocks,
   getHomepageSlots,
   getHornRegional,
@@ -26,8 +27,8 @@ import {
   getTrending,
   getVideos,
 } from "@/lib/queries";
-import { getWire } from "@/lib/wire";
-import { WireRail, WireRow } from "@/components/wire";
+import { balanceByCountry, getWire, spreadSources } from "@/lib/wire";
+import { WireRail, WireRow, WireTextItem } from "@/components/wire";
 import { articleHref, formatDuration } from "@/lib/format";
 import { IconArrowRight, IconPlay, IconTrend } from "@/components/icons";
 
@@ -51,8 +52,8 @@ export default async function HomePage() {
     counts,
     videos,
     slots,
-    wireMain,
-    wireRail,
+    wirePool,
+    wireCountries,
   ] = await Promise.all([
     getTrending("week", 5),
     getCountryBlocks([...usedIds]),
@@ -62,11 +63,10 @@ export default async function HomePage() {
     getCategoryCounts(),
     getVideos(4),
     getHomepageSlots(),
-    // The wire's main home is a full-width band of three columns.
-    getWire({ take: 12 }),
-    // A different slice for the sidebar rail, so the same headline never
-    // appears twice on one page.
-    getWire({ take: 5, skip: 12 }),
+    // One pool, divided below. Fetching it once is what lets each slice be
+    // balanced across the four countries and still not overlap the others.
+    getWire({ take: 90 }),
+    getCountries(),
   ]);
 
   const [politics, business, security, culture, sports, explained] = await Promise.all([
@@ -78,9 +78,72 @@ export default async function HomePage() {
     getByCategory("explained", { take: 4, exclude: [...usedIds] }),
   ]);
 
+  /**
+   * Divide the wire between the three places it appears on this page.
+   *
+   * Each slice is dealt round-robin between the four countries rather than
+   * taken straight off the top by time. On a pure recency slice every one of
+   * these was Somali — not a judgement, just arithmetic, since Somali outlets
+   * are the most numerous and prolific we can reach. Claiming in order keeps
+   * the three slices from overlapping.
+   */
+  const countrySlugs = wireCountries.map((c) => c.slug);
+  const claimed = new Set<string>();
+  const claim = (n: number) => {
+    const picked = balanceByCountry(
+      wirePool.filter((i) => !claimed.has(i.id)),
+      n,
+      countrySlugs,
+    );
+    for (const i of picked) claimed.add(i.id);
+    // Balanced by country, then de-clumped by outlet: a country queue is
+    // usually one newsroom deep at the top, so the result was three Goobjoog
+    // headlines followed by four from La Nation.
+    return spreadSources(picked);
+  };
+
+  const wireLatest = claim(9);
+  const wireMain = claim(12);
+  const wireRail = claim(5);
+
   const peopleFeature = slots.get("people-feature");
   // Wider now that Latest sits in the main column across two or three columns.
-  const latestColumn = latest.filter((a) => !usedIds.has(a.id)).slice(0, 9);
+  const latestColumn = latest.filter((a) => !usedIds.has(a.id));
+
+  /**
+   * A section headed "Latest" has to actually be latest.
+   *
+   * It listed our own articles only, and with nothing filed for days it was
+   * showing four-day-old headlines under that heading while the wire sitting
+   * lower on the same page was two hours old. Both sources go in, ordered by
+   * time, so whatever is genuinely newest leads. Wire rows name their outlet
+   * and link out; the grid itself is unchanged.
+   */
+  const latestMixed = (() => {
+    const articles = latestColumn.map((a) => ({
+      kind: "article" as const,
+      at: a.publishedAt?.getTime() ?? 0,
+      item: a,
+    }));
+    const wire = wireLatest.map((w) => ({
+      kind: "wire" as const,
+      at: w.publishedAt.getTime(),
+      item: w,
+    }));
+
+    // Merged head-to-head rather than concatenated and re-sorted, because the
+    // wire list has already been de-clumped by outlet and a global sort throws
+    // that away — putting four consecutive La Nation headlines back.
+    const out: (typeof articles[number] | typeof wire[number])[] = [];
+    let i = 0;
+    let j = 0;
+    while (out.length < 9 && (i < articles.length || j < wire.length)) {
+      const takeArticle =
+        j >= wire.length || (i < articles.length && articles[i].at >= wire[j].at);
+      out.push(takeArticle ? articles[i++] : wire[j++]);
+    }
+    return out;
+  })();
 
   const categoryTiles = categories
     // The regional desk already has its own landing page and sidebar panel.
@@ -280,9 +343,13 @@ export default async function HomePage() {
       <section className="mt-9">
         <SectionHead title="Latest" href="/latest" hrefLabel="All" light />
         <div className="grid gap-x-8 sm:grid-cols-2 lg:grid-cols-3">
-          {latestColumn.map((a) => (
-            <TextItem key={a.id} article={a} />
-          ))}
+          {latestMixed.map((row) =>
+            row.kind === "article" ? (
+              <TextItem key={row.item.id} article={row.item} />
+            ) : (
+              <WireTextItem key={row.item.id} item={row.item} />
+            ),
+          )}
         </div>
       </section>
 

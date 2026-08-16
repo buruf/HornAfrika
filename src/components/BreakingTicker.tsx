@@ -4,7 +4,14 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef } from "react";
 import { IconArrowLeft, IconArrowRight, IconBolt } from "@/components/icons";
 
-export type TickerItem = { href: string; headline: string };
+export type TickerItem = {
+  href: string;
+  headline: string;
+  /** Outlet name, when the headline came from the wire rather than from us. */
+  source?: string;
+  /** Wire headlines leave the site, so they open in a new tab and say so. */
+  external?: boolean;
+};
 
 /**
  * A restrained breaking-news strip (spec §5). It scrolls rather than flashes,
@@ -60,12 +67,31 @@ export function BreakingTicker({ items }: { items: TickerItem[] }) {
           {items.map((item, i) => (
             <span key={item.href} className="flex shrink-0 items-center">
               {i > 0 && <span className="px-4 text-rule-strong" aria-hidden>•</span>}
-              <Link
-                href={item.href}
-                className="whitespace-nowrap text-[0.84rem] font-semibold text-ink hover:text-brand"
-              >
-                {item.headline}
-              </Link>
+              {item.source && (
+                <span className="mr-2 whitespace-nowrap text-[0.66rem] font-extrabold uppercase tracking-[0.07em] text-ink-mute">
+                  {item.source}
+                </span>
+              )}
+              {item.external ? (
+                <a
+                  href={item.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="whitespace-nowrap text-[0.84rem] font-semibold text-ink hover:text-brand"
+                >
+                  {item.headline}
+                  <span className="ml-1 text-[0.7rem] font-normal text-ink-mute" aria-hidden>
+                    ↗
+                  </span>
+                </a>
+              ) : (
+                <Link
+                  href={item.href}
+                  className="whitespace-nowrap text-[0.84rem] font-semibold text-ink hover:text-brand"
+                >
+                  {item.headline}
+                </Link>
+              )}
             </span>
           ))}
         </div>

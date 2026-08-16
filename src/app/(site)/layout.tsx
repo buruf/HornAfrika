@@ -1,7 +1,9 @@
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { BreakingTicker } from "@/components/BreakingTicker";
-import { getBreaking } from "@/lib/queries";
+import { getBreaking, getCountries } from "@/lib/queries";
+import { balanceByCountry, getWire, spreadSources } from "@/lib/wire";
+import { buildTickerItems } from "@/lib/ticker";
 import { articleHref } from "@/lib/format";
 import { SITE } from "@/lib/site";
 
@@ -23,9 +25,30 @@ export default async function SiteLayout({
 }) {
   // The ticker is chrome, not content. If the database is briefly unreachable
   // the right outcome is a page without a ticker, not an error page.
-  let breaking: Awaited<ReturnType<typeof getBreaking>> = [];
+  // The strip carries editor-flagged stories while they are still current,
+  // and the newest wire headlines the rest of the time. Without the second
+  // half it advertised a five-day-old story as breaking news, because nothing
+  // had been flagged since.
+  let tickerItems: ReturnType<typeof buildTickerItems> = [];
   try {
-    breaking = await getBreaking();
+    const [breaking, pool, countries] = await Promise.all([
+      getBreaking(),
+      getWire({ take: 60 }),
+      getCountries(),
+    ]);
+    // Dealt round-robin, or the strip is eight Somali headlines: those outlets
+    // publish most, so straight recency hands them the whole ticker.
+    const wire = spreadSources(
+      balanceByCountry(pool, 8, countries.map((c) => c.slug)),
+    );
+    tickerItems = buildTickerItems(
+      breaking.map((a) => ({
+        headline: a.headline,
+        publishedAt: a.publishedAt,
+        href: articleHref(a),
+      })),
+      wire,
+    );
   } catch (err) {
     console.error("Breaking ticker unavailable:", err);
   }
@@ -58,14 +81,7 @@ export default async function SiteLayout({
 
       <SiteHeader />
 
-      {breaking.length > 0 && (
-        <BreakingTicker
-          items={breaking.map((a) => ({
-            href: articleHref(a),
-            headline: a.headline,
-          }))}
-        />
-      )}
+      {tickerItems.length > 0 && <BreakingTicker items={tickerItems} />}
 
       <main id="main">{children}</main>
 

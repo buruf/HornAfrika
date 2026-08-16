@@ -172,6 +172,37 @@ export function WireRow({ item }: { item: WireCardItem }) {
 }
 
 /**
+ * A wire headline in the compact row style used by the Latest grid.
+ *
+ * Deliberately built to match TextItem in components/cards.tsx line for line —
+ * same border, same padding, same type scale — so mixing wire headlines into
+ * that grid changes what it says, not how it looks. The outlet name sits where
+ * the category chip would, and the arrow marks the link out.
+ */
+export function WireTextItem({ item }: { item: WireCardItem }) {
+  return (
+    <article className="border-b border-rule py-3 last:border-b-0">
+      <div className="mb-1 flex flex-wrap items-center gap-2">
+        <Credit
+          item={item}
+          className="text-[0.68rem] font-extrabold uppercase tracking-[0.08em] text-brand"
+        />
+        {item.source.stateAffiliated && <StateTag />}
+        <span className="meta ml-auto">{timeAgo(item.publishedAt)}</span>
+      </div>
+      <a href={item.url} target="_blank" rel="noopener noreferrer">
+        <h3 className="hl clamp-2 text-[0.98rem]">
+          {item.title}
+          <span className="ml-1 text-[0.72rem] font-normal text-ink-mute" aria-hidden>
+            ↗
+          </span>
+        </h3>
+      </a>
+    </article>
+  );
+}
+
+/**
  * The standing explanation. Shown wherever wire content appears, so a reader is
  * never left guessing whether they are reading Hornafrika or someone else.
  */
