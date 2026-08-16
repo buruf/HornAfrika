@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parseFeed, splitOriginalPublisher, toExcerpt } from "@/lib/rss";
+import {
+  looksLikeAPhoto,
+  parseFeed,
+  splitOriginalPublisher,
+  toExcerpt,
+} from "@/lib/rss";
 
 describe("toExcerpt()", () => {
   it("strips tags and collapses whitespace", () => {
@@ -209,5 +214,46 @@ describe("splitOriginalPublisher", () => {
   it("ignores an implausibly long bracket", () => {
     const s = `[${"x".repeat(60)}] body text`;
     expect(splitOriginalPublisher(s).publisher).toBeUndefined();
+  });
+});
+
+describe("looksLikeAPhoto", () => {
+  /**
+   * Ethiopia Insight's feed leads its body with a PayPal donate button, which
+   * became the story's thumbnail on the wire. A donate button as a news
+   * picture looks broken, so an image that fails this check is dropped and the
+   * card renders text-only.
+   */
+  it("rejects the widgets feeds put at the top of a body", () => {
+    for (const u of [
+      "https://www.paypal.com/en_US/i/btn/btn_donate_LG.gif",
+      "https://secure.gravatar.com/avatar/abc123",
+      "https://example.com/wp-content/uploads/site-logo-2024.png",
+      "https://example.com/assets/share-icon.png",
+      "https://example.com/img/1x1.png",
+      "https://feeds.feedburner.com/~ff/tracker.gif",
+      "https://example.com/anim/banner.gif",
+      "https://example.com/brand/mark.svg",
+    ]) {
+      expect(looksLikeAPhoto(u)).toBe(false);
+    }
+  });
+
+  it("keeps ordinary press photography", () => {
+    for (const u of [
+      "https://addisfortune.news/wp-content/uploads/2026/08/Prosecutors-Charge-Seven.jpg",
+      "https://puntlandpost.net/wp-content/uploads/2026/08/100021.jpeg",
+      "https://i0.wp.com/caasimada.net/photo-of-the-minister.webp?resize=900",
+      "https://ethiopianmonitor.com/2026/08/parliament.png",
+    ]) {
+      expect(looksLikeAPhoto(u)).toBe(true);
+    }
+  });
+
+  it("does not reject a photo whose filename merely contains a keyword", () => {
+    // "icon" inside "iconic", "share" inside "shareholders" — the boundaries
+    // in the pattern are what stop these being thrown away.
+    expect(looksLikeAPhoto("https://x.com/uploads/iconic-moment.jpg")).toBe(true);
+    expect(looksLikeAPhoto("https://x.com/uploads/shareholders-meet.jpg")).toBe(true);
   });
 });

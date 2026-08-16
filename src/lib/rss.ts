@@ -135,16 +135,49 @@ function linkOf(node: unknown): string {
   return "";
 }
 
+/**
+ * Is this a photograph attached to the story, or furniture?
+ *
+ * Feeds that embed the image in the description hand us the first <img> in the
+ * body, and that is often not the picture: Ethiopia Insight leads with a
+ * PayPal donate button, and other feeds start with a logo, a share icon or a
+ * 1x1 tracking pixel. One of those as a news thumbnail looks broken, so an
+ * image that fails this check is dropped and the card renders text-only —
+ * which it handles.
+ */
+const NOT_A_PHOTO = [
+  /paypal/i,
+  /gravatar/i,
+  /feedburner|feedproxy|feedsportal/i,
+  /doubleclick|googlesyndication|scorecardresearch/i,
+  /[-_./](logo|icon|avatar|badge|button|banner|spacer|pixel|donate|share)[-_./]/i,
+  /[-_./](1x1|blank|transparent|placeholder)[-_./]/i,
+  // Animated and vector files in a feed body are decoration, not photography.
+  /\.(gif|svg)(\?|$)/i,
+];
+
+export function looksLikeAPhoto(url: string): boolean {
+  return !NOT_A_PHOTO.some((p) => p.test(url));
+}
+
 function imageOf(item: Record<string, unknown>): string | undefined {
   // media:content / media:thumbnail / enclosure, in that order of usefulness.
   const media = first(item["media:content"] as never) as Record<string, unknown> | undefined;
-  if (media?.["@_url"]) return String(media["@_url"]);
+  if (media?.["@_url"] && looksLikeAPhoto(String(media["@_url"]))) {
+    return String(media["@_url"]);
+  }
 
   const thumb = first(item["media:thumbnail"] as never) as Record<string, unknown> | undefined;
-  if (thumb?.["@_url"]) return String(thumb["@_url"]);
+  if (thumb?.["@_url"] && looksLikeAPhoto(String(thumb["@_url"]))) {
+    return String(thumb["@_url"]);
+  }
 
   const enc = first(item.enclosure as never) as Record<string, unknown> | undefined;
-  if (enc?.["@_url"] && String(enc["@_type"] ?? "").startsWith("image")) {
+  if (
+    enc?.["@_url"] &&
+    String(enc["@_type"] ?? "").startsWith("image") &&
+    looksLikeAPhoto(String(enc["@_url"]))
+  ) {
     return String(enc["@_url"]);
   }
 
@@ -152,8 +185,12 @@ function imageOf(item: Record<string, unknown>): string | undefined {
   const html = String(
     item["content:encoded"] ?? textOf(item.description) ?? item.description ?? "",
   );
-  const m = html.match(/<img[^>]+src=["']([^"']+)["']/i);
-  return m?.[1];
+  // Take the first embedded image that is plausibly the story's own picture
+  // rather than a donate button or a tracking pixel.
+  for (const m of html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi)) {
+    if (looksLikeAPhoto(m[1])) return m[1];
+  }
+  return undefined;
 }
 
 function dateOf(item: Record<string, unknown>): Date {
