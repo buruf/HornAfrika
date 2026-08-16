@@ -15,6 +15,8 @@ export const wireSelect = {
   imageUrl: true,
   // The desk this was filed to, or null. See topic-tagger.ts.
   topic: true,
+  // Set when we fetched this from a syndicator rather than the newsroom.
+  originalPublisher: true,
   source: {
     select: {
       slug: true,
@@ -183,6 +185,43 @@ export function balanceByCountry<
   return [...picked.values()].sort(
     (a, b) => b.publishedAt.getTime() - a.publishedAt.getTime(),
   );
+}
+
+/**
+ * Nudge items so the same outlet does not appear twice in a row.
+ *
+ * Country balance fixes which stories get picked; it does nothing about the
+ * order they land in, because the list is put back into time order afterwards.
+ * Outlets publish in batches — Addis Fortune files a week's stories within
+ * minutes of each other — so the top of the wire was six consecutive items
+ * from one masthead. Balanced by country, monotonous to read.
+ *
+ * This is the lightest possible fix: walk the list, and when an item repeats
+ * the previous outlet, pull the next differently-sourced item forward past it.
+ * Chronology is disturbed by a few positions at most, and never reordered
+ * wholesale. If everything left is from one outlet it simply gives up, which
+ * is correct — there is nothing to interleave with.
+ */
+export function spreadSources<T extends { source: { slug: string } }>(
+  items: T[],
+): T[] {
+  const out = [...items];
+  for (let i = 1; i < out.length; i++) {
+    if (out[i].source.slug !== out[i - 1].source.slug) continue;
+
+    const swap = out.findIndex(
+      (candidate, j) =>
+        j > i &&
+        candidate.source.slug !== out[i - 1].source.slug &&
+        // Do not create a new clash with whatever follows the hole we leave.
+        (j + 1 >= out.length || out[j + 1].source.slug !== out[i].source.slug),
+    );
+    if (swap > i) {
+      const [moved] = out.splice(swap, 1);
+      out.splice(i, 0, moved);
+    }
+  }
+  return out;
 }
 
 /**

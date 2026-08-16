@@ -40,6 +40,7 @@ async function main() {
       countryId: s.country ? (countryId.get(s.country) ?? null) : null,
       active: s.active,
       stateAffiliated: s.stateAffiliated ?? false,
+      localOnly: s.localOnly ?? false,
       note: s.note ?? null,
       order: i,
     };

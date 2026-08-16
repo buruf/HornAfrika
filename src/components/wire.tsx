@@ -15,6 +15,31 @@ import type { WireCardItem } from "@/lib/wire";
  * Hornafrika reporting and which is a link out.
  */
 
+/**
+ * Who wrote this, and where we found it.
+ *
+ * Normally those are the same outlet and only one name shows. When we fetched
+ * a syndicator, the newsroom that did the reporting is named first and the
+ * syndicator second — "Shabelle — via AllAfrica". Crediting AllAfrica alone
+ * for a Shabelle story would be inaccurate, and the feed tells us, so we say
+ * it.
+ */
+function Credit({ item, className = "" }: { item: WireCardItem; className?: string }) {
+  const wrote = item.originalPublisher;
+  return (
+    <span className={className}>
+      {wrote ? (
+        <>
+          {wrote}
+          <span className="font-semibold text-ink-mute"> — via {item.source.name}</span>
+        </>
+      ) : (
+        item.source.name
+      )}
+    </span>
+  );
+}
+
 const KIND_LABEL: Record<string, string> = {
   REGIONAL: "Regional",
   HORN: "Horn",
@@ -40,16 +65,38 @@ function StateTag() {
 export function WireLink({
   item,
   showExcerpt = true,
+  showImage = false,
 }: {
   item: WireCardItem;
   showExcerpt?: boolean;
+  /** Publisher thumbnail above the headline, where the feed offers one. */
+  showImage?: boolean;
 }) {
   return (
     <article className="border-l-2 border-rule-strong pl-3 transition-colors hover:border-brand">
+      {showImage && item.imageUrl && (
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          tabIndex={-1}
+          aria-hidden
+          className="mb-2 block overflow-hidden bg-shell"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={item.imageUrl}
+            alt=""
+            loading="lazy"
+            className="h-[124px] w-full object-cover transition-transform duration-500 hover:scale-[1.04]"
+          />
+        </a>
+      )}
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="text-[0.7rem] font-extrabold uppercase tracking-[0.07em] text-ink">
-          {item.source.name}
-        </span>
+        <Credit
+          item={item}
+          className="text-[0.7rem] font-extrabold uppercase tracking-[0.07em] text-ink"
+        />
         {item.source.stateAffiliated && <StateTag />}
         {item.source.language !== "en" && (
           <span className="text-[0.62rem] font-bold uppercase tracking-[0.06em] text-ink-mute">
@@ -85,7 +132,8 @@ export function WireLink({
 /** Larger presentation for the /wire page itself. */
 export function WireRow({ item }: { item: WireCardItem }) {
   return (
-    <article className="border-b border-rule py-4 last:border-b-0">
+    <article className="grid gap-4 border-b border-rule py-4 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_180px]">
+      <div className="min-w-0">
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
         <a
           href={item.source.homepageUrl}
@@ -93,7 +141,7 @@ export function WireRow({ item }: { item: WireCardItem }) {
           rel="noopener noreferrer"
           className="text-[0.72rem] font-extrabold uppercase tracking-[0.07em] text-brand hover:underline"
         >
-          {item.source.name}
+          <Credit item={item} />
         </a>
         <span className="border border-rule px-1.5 py-px text-[0.6rem] font-bold uppercase tracking-[0.06em] text-ink-mute">
           {KIND_LABEL[item.source.kind] ?? item.source.kind}
@@ -138,10 +186,36 @@ export function WireRow({ item }: { item: WireCardItem }) {
             the publisher's work, not ours, and saying so here is clearer than
             burying it in a policy page nobody opens. */}
         <span className="text-[0.72rem] text-ink-mute">
-          Headline and extract © {item.source.name} — reproduced for reference,
-          full article at the publisher.
+          Headline{item.imageUrl ? ", extract and picture" : " and extract"} ©{" "}
+          {item.originalPublisher ?? item.source.name} — reproduced for
+          reference, full article at the publisher.
         </span>
       </div>
+      </div>
+
+      {/* The publisher's own thumbnail, hotlinked rather than copied — the
+          same posture as the headline. Decorative: it carries nothing the
+          headline does not, so it is hidden from screen readers and the link
+          beside it stands alone. Roughly half of items have one, and the
+          column simply collapses when they do not. */}
+      {item.imageUrl && (
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          tabIndex={-1}
+          aria-hidden
+          className="order-first block overflow-hidden bg-shell sm:order-none"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={item.imageUrl}
+            alt=""
+            loading="lazy"
+            className="h-[130px] w-full object-cover transition-transform duration-500 hover:scale-[1.04] sm:h-[110px]"
+          />
+        </a>
+      )}
     </article>
   );
 }
@@ -235,7 +309,7 @@ export function WireHero({ item }: { item: WireCardItem }) {
             rel="noopener noreferrer"
             className="text-[0.78rem] font-extrabold uppercase tracking-[0.08em] text-brand hover:underline"
           >
-            {item.source.name}
+            <Credit item={item} />
           </a>
           {item.source.stateAffiliated && <StateTag />}
           <CountryChips item={item} />
@@ -263,8 +337,8 @@ export function WireHero({ item }: { item: WireCardItem }) {
         )}
 
         <p className="mt-2.5 text-[0.74rem] text-ink-mute">
-          Headline, extract and picture © {item.source.name} — reproduced for
-          reference, full article at the publisher.
+          Headline, extract and picture © {item.originalPublisher ?? item.source.name}{" "}
+          — reproduced for reference, full article at the publisher.
         </p>
       </div>
     </article>

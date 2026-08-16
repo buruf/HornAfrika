@@ -16,7 +16,38 @@ export type ParsedItem = {
   author?: string;
   imageUrl?: string;
   publishedAt: Date;
+  /** The newsroom that actually wrote it, when the feed we fetched is itself
+   *  a syndicator. See splitOriginalPublisher. */
+  originalPublisher?: string;
 };
+
+/**
+ * Pull the original newsroom out of a syndicated excerpt.
+ *
+ * AllAfrica republishes other people's reporting and marks the source in the
+ * body: "[Shabelle] Addis Ababa -- Ethiopia's ambassador...". Crediting
+ * AllAfrica for a Shabelle story would be wrong, and the information is right
+ * there, so it is parsed out and shown as "Shabelle — via AllAfrica".
+ *
+ * Conservative on purpose: the prefix must be a short bracketed name at the
+ * very start. Square brackets appear in ordinary copy — "[Editor: ...]",
+ * "[sic]" — and mistaking one for a byline would invent a publisher, which is
+ * worse than missing one.
+ */
+export function splitOriginalPublisher(excerpt: string): {
+  publisher?: string;
+  text: string;
+} {
+  const m = /^\[([^\]]{2,40})\]\s*/.exec(excerpt);
+  if (!m) return { text: excerpt };
+
+  const name = m[1].trim();
+  // A real masthead, not a note to the reader.
+  if (/[:.]/.test(name) || /^(sic|editor|photo|file|update)$/i.test(name)) {
+    return { text: excerpt };
+  }
+  return { publisher: name, text: excerpt.slice(m[0].length) };
+}
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -191,11 +222,14 @@ export function parseFeed(xml: string, feedUrl: string): ParsedItem[] {
           ? String(authorNode).slice(0, 120)
           : undefined;
 
+    const { publisher, text } = splitOriginalPublisher(toExcerpt(body));
+
     out.push({
       guid,
       url: url.split("#")[0],
       title,
-      excerpt: toExcerpt(body),
+      excerpt: text,
+      originalPublisher: publisher,
       author: author && author !== "undefined" ? author : undefined,
       imageUrl: imageOf(item),
       publishedAt: dateOf(item),

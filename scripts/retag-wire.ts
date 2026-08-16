@@ -14,7 +14,7 @@
  */
 
 import { PrismaClient } from "@prisma/client";
-import { detectCountries } from "../src/lib/country-tagger";
+import { resolveCountries } from "../src/lib/country-tagger";
 import { detectTopic } from "../src/lib/topic-tagger";
 
 const db = new PrismaClient();
@@ -31,10 +31,12 @@ async function main() {
       title: true,
       excerpt: true,
       topic: true,
+      source: { select: { localOnly: true, country: { select: { slug: true } } } },
       countries: { select: { countryId: true, country: { select: { slug: true } } } },
     },
   });
 
+  let inheritedCount = 0;
   const topicTally: Record<string, number> = {};
   let topicChanged = 0;
   let gained = 0;
@@ -44,9 +46,13 @@ async function main() {
 
   for (const item of items) {
     const before = new Set(item.countries.map((c) => c.country.slug));
-    const after = new Set(
-      detectCountries(`${item.title} ${item.excerpt}`).filter((s) => idBySlug.has(s)),
-    );
+    const { slugs, inherited } = resolveCountries(`${item.title} ${item.excerpt}`, {
+      publisherCountry: item.source.country?.slug ?? null,
+      publisherLocalOnly: item.source.localOnly,
+      hasExcerpt: item.excerpt.trim().length > 0,
+    });
+    if (inherited) inheritedCount++;
+    const after = new Set(slugs.filter((s) => idBySlug.has(s)));
 
     const added = [...after].filter((s) => !before.has(s));
     const removed = [...before].filter((s) => !after.has(s));
@@ -96,6 +102,7 @@ async function main() {
     console.log(`  ${String(n).padStart(4)} ${String(pct).padStart(3)}%  ${topic}`);
   }
   console.log(`${topicChanged} items had their desk set or changed`);
+  console.log(`${inheritedCount} items took their country from the outlet beat`);
 
   console.log(
     `\n${items.length} items · ${gained} gained a tag · ${lost} lost one · ${unchanged} unchanged`,

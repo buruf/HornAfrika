@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { balanceByCountry } from "./wire";
+import { balanceByCountry, spreadSources } from "./wire";
 
 const COUNTRIES = ["somalia", "ethiopia", "djibouti", "eritrea"];
 
@@ -148,5 +148,61 @@ describe("balanceByCountry", () => {
     const order = pool.map((p) => p.id);
     balanceByCountry(pool, 2, COUNTRIES);
     expect(pool.map((p) => p.id)).toEqual(order);
+  });
+});
+
+describe("spreadSources", () => {
+  const it_ = (id: string, slug: string) => ({ id, source: { slug } });
+  const slugs = (r: { source: { slug: string } }[]) => r.map((x) => x.source.slug);
+  const runs = (r: { source: { slug: string } }[]) =>
+    slugs(r).filter((s, i, a) => i > 0 && s === a[i - 1]).length;
+
+  /**
+   * The case this exists for: Addis Fortune files a week of stories within
+   * minutes, so time order put six of them at the top of the wire.
+   */
+  it("breaks up a batch from one outlet", () => {
+    const items = [
+      it_("a1", "addis-fortune"),
+      it_("a2", "addis-fortune"),
+      it_("a3", "addis-fortune"),
+      it_("a4", "addis-fortune"),
+      it_("b1", "jowhar"),
+      it_("c1", "rtd-dj"),
+      it_("d1", "awate"),
+    ];
+    const out = spreadSources(items);
+    expect(runs(out)).toBeLessThan(runs(items));
+    expect(out).toHaveLength(items.length);
+  });
+
+  it("keeps every item exactly once", () => {
+    const items = [
+      it_("a1", "x"), it_("a2", "x"), it_("b1", "y"), it_("b2", "y"), it_("c1", "z"),
+    ];
+    const out = spreadSources(items);
+    expect(out.map((o) => o.id).sort()).toEqual(["a1", "a2", "b1", "b2", "c1"]);
+  });
+
+  it("leaves an already-varied list alone", () => {
+    const items = [it_("1", "x"), it_("2", "y"), it_("3", "z")];
+    expect(spreadSources(items)).toEqual(items);
+  });
+
+  it("gives up gracefully when everything is one outlet", () => {
+    const items = [it_("1", "x"), it_("2", "x"), it_("3", "x")];
+    expect(spreadSources(items).map((o) => o.id)).toEqual(["1", "2", "3"]);
+  });
+
+  it("handles empty and single-item lists", () => {
+    expect(spreadSources([])).toEqual([]);
+    expect(spreadSources([it_("1", "x")])).toHaveLength(1);
+  });
+
+  it("does not mutate its input", () => {
+    const items = [it_("a1", "x"), it_("a2", "x"), it_("b1", "y")];
+    const before = items.map((i) => i.id);
+    spreadSources(items);
+    expect(items.map((i) => i.id)).toEqual(before);
   });
 });

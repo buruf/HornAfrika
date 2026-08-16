@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseFeed, toExcerpt } from "@/lib/rss";
+import { parseFeed, splitOriginalPublisher, toExcerpt } from "@/lib/rss";
 
 describe("toExcerpt()", () => {
   it("strips tags and collapses whitespace", () => {
@@ -166,5 +166,48 @@ describe("parseFeed()", () => {
   it("handles a single item that is not wrapped in an array", () => {
     // fast-xml-parser collapses a lone <item> to an object, not a list.
     expect(parseFeed(RSS2, "https://example.com/feed")).toHaveLength(1);
+  });
+});
+
+describe("splitOriginalPublisher", () => {
+  it("lifts the newsroom AllAfrica names in the body", () => {
+    const r = splitOriginalPublisher(
+      "[Shabelle] Addis Ababa -- Ethiopia's ambassador has accused Eritrea...",
+    );
+    expect(r.publisher).toBe("Shabelle");
+    expect(r.text).toBe(
+      "Addis Ababa -- Ethiopia's ambassador has accused Eritrea...",
+    );
+  });
+
+  it("leaves an ordinary excerpt alone", () => {
+    const plain = "Ethiopia's central bank raised rates on Tuesday.";
+    expect(splitOriginalPublisher(plain)).toEqual({ text: plain });
+  });
+
+  /**
+   * Square brackets appear in ordinary copy. Inventing a publisher from one is
+   * worse than missing a real one, so anything that does not look like a
+   * masthead is left in place.
+   */
+  it("does not mistake an editorial note for a byline", () => {
+    for (const s of [
+      "[Editor: confirm the figure] The budget passed.",
+      "[sic] as published",
+      "[Photo] A crowd gathers",
+      "[File] Troops on parade",
+    ]) {
+      expect(splitOriginalPublisher(s).publisher).toBeUndefined();
+    }
+  });
+
+  it("ignores a bracket that is not at the start", () => {
+    const s = "The minister said [sic] the deal was done";
+    expect(splitOriginalPublisher(s)).toEqual({ text: s });
+  });
+
+  it("ignores an implausibly long bracket", () => {
+    const s = `[${"x".repeat(60)}] body text`;
+    expect(splitOriginalPublisher(s).publisher).toBeUndefined();
   });
 });

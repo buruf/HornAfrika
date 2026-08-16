@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { parseFeed, type ParsedItem } from "@/lib/rss";
-import { detectCountries } from "@/lib/country-tagger";
+import { detectCountries, resolveCountries } from "@/lib/country-tagger";
 import { detectTopic } from "@/lib/topic-tagger";
 
 /**
@@ -40,7 +40,8 @@ export type FetchResult = {
 // ---------------------------------------------------------------------------
 
 // Pure text logic, extracted so it can be tested without a database. See
-// country-tagger.ts for why it never inherits the publisher country.
+// country-tagger.ts for the rule: the text decides, and the outlet beat is
+// only a guarded fallback when the text names nowhere at all.
 export { detectCountries };
 
 // ---------------------------------------------------------------------------
@@ -90,6 +91,10 @@ type SourceRow = {
   feedUrl: string;
   countryId: string | null;
   lastFetchedAt: Date | null;
+  // Needed for the publisher-inheritance fallback: only a single-country
+  // outlet has a beat worth inheriting, and only its own country.
+  localOnly: boolean;
+  countrySlug: string | null;
 };
 
 /** Fetch one source and store anything new. Never throws. */
@@ -149,24 +154,28 @@ export async function fetchSource(
           excerpt: item.excerpt,
           author: item.author ?? null,
           imageUrl: item.imageUrl ?? null,
+          originalPublisher: item.originalPublisher ?? null,
           publishedAt: item.publishedAt,
           topic: detectTopic(`${item.title} ${item.excerpt}`),
         },
       });
 
-      const detected = detectCountries(`${item.title} ${item.excerpt}`);
+      const { slugs } = resolveCountries(`${item.title} ${item.excerpt}`, {
+        publisherCountry: source.countrySlug,
+        publisherLocalOnly: source.localOnly,
+        hasExcerpt: item.excerpt.trim().length > 0,
+      });
       const countryIds = new Set<string>();
-      for (const slug of detected) {
+      for (const slug of slugs) {
         const id = countryIdBySlug.get(slug);
         if (id) countryIds.add(id);
       }
 
-      // Country tags come from the item's own text, never from who published
-      // it. Inheriting the outlet's country was measured against a live pull
-      // and filed a Colombian bombing, a US mosquito programme and an Arsenal
-      // transfer under Somalia — it produced about as many wrong tags as right
-      // ones. Untagged items still appear on the main wire and under their
-      // source's filter, which is where an international story belongs.
+      // The text decides. Only when it names no country anywhere does the
+      // outlet's own beat stand in, and only for a single-country outlet whose
+      // item names nowhere else on earth — see resolveCountries. Inheriting
+      // unconditionally was measured on a live pull and filed a Colombian
+      // bombing and an Arsenal transfer under Somalia.
 
       if (countryIds.size > 0) {
         await db.wireItemCountry.createMany({
@@ -223,17 +232,23 @@ export async function runAggregation(
         feedUrl: true,
         countryId: true,
         lastFetchedAt: true,
+        localOnly: true,
+        country: { select: { slug: true } },
       },
     }),
     db.country.findMany({ select: { id: true, slug: true } }),
   ]);
 
   const bySlug = new Map(countries.map((c) => [c.slug, c.id]));
+  const rows: SourceRow[] = sources.map((s) => ({
+    ...s,
+    countrySlug: s.country?.slug ?? null,
+  }));
   const results: FetchResult[] = [];
 
   const CONCURRENCY = 5;
-  for (let i = 0; i < sources.length; i += CONCURRENCY) {
-    const batch = sources.slice(i, i + CONCURRENCY);
+  for (let i = 0; i < rows.length; i += CONCURRENCY) {
+    const batch = rows.slice(i, i + CONCURRENCY);
     results.push(
       ...(await Promise.all(batch.map((s) => fetchSource(s, bySlug, opts)))),
     );

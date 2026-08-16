@@ -442,6 +442,19 @@ model Source {
   // excluded. Editors can change this in the CMS as ownership changes.
   stateAffiliated Boolean @default(false)
 
+  // This outlet writes only about its own country, so an item of its that
+  // names no country at all can safely be filed under `country`.
+  //
+  // Off by default and never inferred. It was measured first: outlets split
+  // into papers covering their own market (Addis Fortune: "Power Utility
+  // Spends Past Its Record Year") and outlets running a world-news section
+  // (Jowhar, which files Musk, Assad and Nigel Farage). The two are
+  // indistinguishable by any statistic tried — same share of untagged items —
+  // so this is a judgement about a masthead, made by reading it, and it must
+  // stay opt-in. Turning it on for an outlet that republishes world copy
+  // re-creates the bug that filed a Colombian bombing under Somalia.
+  localOnly Boolean @default(false)
+
   // Health, so a silently-dead feed is visible rather than just absent.
   lastFetchedAt DateTime?
   lastStatus    String? // "ok" | "http 403" | "timeout" | ...
@@ -474,6 +487,12 @@ model WireItem {
   excerpt String // capped and stripped at ingest; never the full body
   author  String?
   imageUrl String?
+
+  // When the feed we fetched is itself a syndicator, the newsroom that wrote
+  // the piece. AllAfrica marks it in the body as "[Shabelle] ..." — crediting
+  // the syndicator for someone else's reporting would be wrong, so it is
+  // parsed out and shown as "Shabelle — via AllAfrica".
+  originalPublisher String?
 
   publishedAt DateTime
   fetchedAt   DateTime @default(now())

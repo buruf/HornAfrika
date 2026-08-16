@@ -27,7 +27,12 @@ import {
   getTrending,
   getVideos,
 } from "@/lib/queries";
-import { balanceByCountry, getWire, getWireFreshness } from "@/lib/wire";
+import {
+  balanceByCountry,
+  getWire,
+  getWireFreshness,
+  spreadSources,
+} from "@/lib/wire";
 import { WireBand, WireHero, WireLink, WireRail } from "@/components/wire";
 import { articleHref, formatDuration, timeAgo } from "@/lib/format";
 import { IconArrowRight, IconPlay, IconTrend } from "@/components/icons";
@@ -64,11 +69,12 @@ export default async function HomePage() {
     getCategoryCounts(),
     getVideos(4),
     getHomepageSlots(),
-    // One pool serves both the band and the sidebar rail. Fetching it once and
-    // splitting it here is what lets the rail exclude whatever the band chose,
-    // which a second `skip`-based query could not do once the band stopped
-    // being a straight recency slice.
-    getWire({ take: 120 }),
+    // One pool serves the lead, the band, the country blocks, the rail and the
+    // desk rows, each claiming its slice in order so nothing repeats on the
+    // page. It is deliberately much larger than the sum of those slices: the
+    // desk rows draw last and only take items already matching their desk, so
+    // a tight pool silently starved Business and Society out of the page.
+    getWire({ take: 300 }),
     getWireFreshness(),
     getCountries(),
   ]);
@@ -95,10 +101,10 @@ export default async function HomePage() {
   const wireTop = claim(wirePool, 4);
 
   // Each country is guaranteed a place on the band; the rest goes by recency.
-  const wireMain = balanceByCountry(
-    wirePool.filter((i) => !taken.has(i.id)),
-    11,
-    countrySlugs,
+  // Balanced across the four countries, then nudged so one outlet's batch
+  // does not fill the band with a single masthead.
+  const wireMain = spreadSources(
+    balanceByCountry(wirePool.filter((i) => !taken.has(i.id)), 11, countrySlugs),
   );
   for (const i of wireMain) taken.add(i.id);
 
@@ -454,7 +460,7 @@ export default async function HomePage() {
           />
           <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
             {items.map((item) => (
-              <WireLink key={item.id} item={item} showExcerpt={false} />
+              <WireLink key={item.id} item={item} showExcerpt={false} showImage />
             ))}
           </div>
         </section>

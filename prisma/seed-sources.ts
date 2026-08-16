@@ -21,6 +21,9 @@ export type SeedSource = {
   language?: string;
   active: boolean;
   stateAffiliated?: boolean;
+  /** Writes only about its own country — see Source.localOnly. Read the
+   *  outlet before setting this; being single-country is not enough. */
+  localOnly?: boolean;
   note?: string;
 };
 
@@ -43,7 +46,7 @@ export const SOURCES: SeedSource[] = [
 
   // --------------------------------------------------------------- Ethiopia
   { slug: "ethiopian-monitor", name: "Ethiopian Monitor", homepageUrl: "https://ethiopianmonitor.com", feedUrl: "https://ethiopianmonitor.com/feed/", kind: "REGIONAL", country: "ethiopia", active: true },
-  { slug: "addis-fortune", name: "Addis Fortune", homepageUrl: "https://addisfortune.news", feedUrl: "https://addisfortune.news/feed/", kind: "REGIONAL", country: "ethiopia", active: true },
+  { slug: "addis-fortune", name: "Addis Fortune", homepageUrl: "https://addisfortune.news", feedUrl: "https://addisfortune.news/feed/", kind: "REGIONAL", country: "ethiopia", active: true, localOnly: true, note: "Addis business weekly. Every untagged item checked on 14 Aug 2026 was local Ethiopian copy that simply never names the country — \"Power Utility Spends Past Its Record Year\" — so localOnly is safe here." },
   { slug: "capital-ethiopia", name: "Capital Ethiopia", homepageUrl: "https://www.capitalethiopia.com", feedUrl: "https://www.capitalethiopia.com/feed/", kind: "REGIONAL", country: "ethiopia", active: true },
   { slug: "ethiopia-insight", name: "Ethiopia Insight", homepageUrl: "https://www.ethiopia-insight.com", feedUrl: "https://www.ethiopia-insight.com/feed/", kind: "REGIONAL", country: "ethiopia", active: true },
   { slug: "fana", name: "Fana Broadcasting", homepageUrl: "https://www.fanabc.com", feedUrl: "https://www.fanabc.com/english/feed/", kind: "REGIONAL", country: "ethiopia", active: true, stateAffiliated: true },
@@ -60,7 +63,7 @@ export const SOURCES: SeedSource[] = [
   // --------------------------------------------------------------- Djibouti
   { slug: "la-nation-dj", name: "La Nation", homepageUrl: "https://www.lanation.dj", feedUrl: "https://www.lanation.dj/feed/", kind: "REGIONAL", country: "djibouti", language: "fr", active: true, stateAffiliated: true },
   { slug: "adds-dj", name: "ADDS Djibouti", homepageUrl: "https://www.adds.dj", feedUrl: "https://www.adds.dj/feed/", kind: "REGIONAL", country: "djibouti", language: "fr", active: true, stateAffiliated: true },
-  { slug: "rtd-dj", name: "RTD Djibouti", homepageUrl: "https://www.rtd.dj", feedUrl: "https://www.rtd.dj/feed/", kind: "REGIONAL", country: "djibouti", language: "fr", active: true, stateAffiliated: true, note: "National broadcaster. All three working Djiboutian feeds are state-run — there is no independent press to balance them with, and readers are told so." },
+  { slug: "rtd-dj", name: "RTD Djibouti", homepageUrl: "https://www.rtd.dj", feedUrl: "https://www.rtd.dj/feed/", kind: "REGIONAL", country: "djibouti", language: "fr", active: true, stateAffiliated: true, localOnly: true, note: "National broadcaster, domestic coverage only — checked 14 Aug 2026. All three working Djiboutian feeds are state-run — there is no independent press to balance them with, and readers are told so." },
 
   // ---------------------------------------------------------------- Eritrea
   // Eritrea is by far the hardest of the four to source. The state outlet
@@ -75,6 +78,25 @@ export const SOURCES: SeedSource[] = [
   { slug: "shabait", name: "Shabait (Eritrea Ministry of Information)", homepageUrl: "https://shabait.com", feedUrl: "https://shabait.com/feed/", kind: "REGIONAL", country: "eritrea", active: false, stateAffiliated: true, note: "Blocks automated requests (HTTP 403), reconfirmed 13 Aug 2026. State outlet — if enabled, label it as such for readers." },
   { slug: "tesfanews", name: "TesfaNews", homepageUrl: "https://tesfanews.net", feedUrl: "https://tesfanews.net/feed/", kind: "REGIONAL", country: "eritrea", active: false, note: "Blocks automated requests (HTTP 403)." },
   { slug: "eritrea-hub", name: "Eritrea Hub", homepageUrl: "https://eritreahub.org", feedUrl: "https://eritreahub.org/feed", kind: "REGIONAL", country: "eritrea", active: false, note: "Serves an HTML page at the feed path, reconfirmed 13 Aug 2026. Needs a working feed URL from the publisher." },
+
+  // ------------------------------------------- Syndicated, per country
+  // AllAfrica licenses and republishes African newsrooms, and offers a feed
+  // per country. That is the only per-country supply we have found for the
+  // three countries the wire is thin on, and it roughly doubles Ethiopian and
+  // Eritrean volume on its own.
+  //
+  // Each item names the newsroom that wrote it in the body — "[Shabelle] ..."
+  // — which the parser lifts into originalPublisher so the credit reads
+  // "Shabelle — via AllAfrica" rather than crediting the syndicator for
+  // someone else's reporting.
+  //
+  // AllAfrica also publishes Somalia and East Africa feeds, deliberately not
+  // taken: Somalia is already the best-covered of the four by a wide margin,
+  // and adding thirty more Somali headlines a day would widen exactly the gap
+  // these three are here to close.
+  { slug: "allafrica-ethiopia", name: "AllAfrica", homepageUrl: "https://allafrica.com/ethiopia/", feedUrl: "https://allafrica.com/tools/headlines/rdf/ethiopia/headlines.rdf", kind: "REGIONAL", country: "ethiopia", active: true, note: "Syndicator. Original newsroom is credited per item." },
+  { slug: "allafrica-eritrea", name: "AllAfrica", homepageUrl: "https://allafrica.com/eritrea/", feedUrl: "https://allafrica.com/tools/headlines/rdf/eritrea/headlines.rdf", kind: "REGIONAL", country: "eritrea", active: true, note: "Syndicator. Original newsroom is credited per item. Eritrea's only non-partisan supply — the other two Eritrean feeds are both opposition-aligned." },
+  { slug: "allafrica-djibouti", name: "AllAfrica", homepageUrl: "https://allafrica.com/djibouti/", feedUrl: "https://allafrica.com/tools/headlines/rdf/djibouti/headlines.rdf", kind: "REGIONAL", country: "djibouti", active: true, note: "Syndicator. Original newsroom is credited per item. Low volume, but the only Djiboutian supply that is not state-run." },
 
   // ------------------------------------------------------------ Horn / pan-African
   { slug: "horn-diplomat", name: "Horn Diplomat", homepageUrl: "https://www.horndiplomat.com", feedUrl: "https://www.horndiplomat.com/feed/", kind: "HORN", country: null, active: true },

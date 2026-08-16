@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { countWire, getWire, getWireFreshness, getWireSources } from "@/lib/wire";
+import {
+  balanceByCountry,
+  spreadSources,
+  countWire,
+  getWire,
+  getWireFreshness,
+  getWireSources,
+} from "@/lib/wire";
 import { WireNotice, WireRow } from "@/components/wire";
 import { Breadcrumbs, PageHeader } from "@/components/PageHeader";
 import { SectionHead } from "@/components/SectionHead";
@@ -37,13 +44,34 @@ export default async function WirePage({
   const page = Math.max(1, Number(sp.page ?? 1) || 1);
   const filters = { country: sp.country, source: sp.source, kind: sp.kind };
 
-  const [items, total, sources, countries, freshness] = await Promise.all([
+  const [rawItems, total, sources, countries, freshness] = await Promise.all([
     getWire({ ...filters, take: PER_PAGE, skip: (page - 1) * PER_PAGE }),
     countWire(filters),
     getWireSources(),
     getCountries(),
     getWireFreshness(),
   ]);
+
+  /**
+   * The unfiltered first page is dealt round-robin between the four countries;
+   * everything else stays in strict time order.
+   *
+   * Straight recency made this a Somalia page for the same arithmetic reason
+   * as the homepage — the newest twenty items ran fourteen Somalia to seven
+   * Ethiopia. That is not what a four-country platform should open with.
+   *
+   * It applies only to page one, and only when nothing is filtered: once a
+   * reader asks for a country, a source or page two they have asked something
+   * specific, and reordering would answer a different question. `/latest`
+   * stays chronological throughout — that is the page that promises it.
+   */
+  const unfiltered = !filters.country && !filters.source && !filters.kind;
+  const items =
+    unfiltered && page === 1
+      ? spreadSources(
+          balanceByCountry(rawItems, rawItems.length, countries.map((c) => c.slug)),
+        )
+      : spreadSources(rawItems);
 
   const qs = (extra: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
