@@ -59,15 +59,27 @@ async function main() {
     data: { status: to },
   });
 
-  // Homepage slots point at articles by id; a slot holding a retired article
-  // would render a hole rather than fall back.
-  const slots = await db.homepageSlot.deleteMany({
+  // Homepage slots point at articles by id, and a slot holding a retired
+  // article renders a hole rather than falling back.
+  //
+  // The article is detached from the slot rather than the slot being deleted.
+  // An earlier version deleted the rows, which made --restore a lie: the
+  // articles came back and the front page still had no lead, no country
+  // features and no People panel, because the slots themselves were gone.
+  // Emptying the slot is reversible; deleting it is not.
+  const slots = await db.homepageSlot.updateMany({
     where: { article: { isSeed: true, status: "DRAFT" } },
+    data: { articleId: null },
   });
 
   console.log(
-    `\n${count} article(s) moved to ${to}. ${slots.count} homepage slot(s) cleared.`,
+    `\n${count} article(s) moved to ${to}. ${slots.count} homepage slot(s) emptied.`,
   );
+  if (RESTORE) {
+    console.log(
+      "Slots are not refilled automatically — run scripts/restore-homepage-slots.ts --apply.",
+    );
+  }
 
   await db.$disconnect();
 }

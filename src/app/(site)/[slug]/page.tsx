@@ -1,23 +1,45 @@
 import { notFound } from "next/navigation";
+import { CountryFlag } from "@/components/CountryFlag";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CountryFlag } from "@/components/CountryFlag";
 import { db } from "@/lib/db";
-import { countWire, getTopicCounts, getWire, getWireSources } from "@/lib/wire";
-import { DeskStrip, WireListPage } from "@/components/WireListPage";
+import {
+  countByCategory,
+  countByCountry,
+  getByCategory,
+  getByCountry,
+  getHornRegional,
+  getTrending,
+  getVideos,
+} from "@/lib/queries";
+import { HeroCard, RowCard, StackedCard, TrendingItem } from "@/components/cards";
+import { SectionHead } from "@/components/SectionHead";
+import { Breadcrumbs, PageHeader } from "@/components/PageHeader";
+import { Pagination } from "@/components/Pagination";
+import { NewsletterForm } from "@/components/NewsletterForm";
+import { AdSlot } from "@/components/AdSlot";
+import { HornMap } from "@/components/HornMap";
+import { getWire } from "@/lib/wire";
+import { WireRail } from "@/components/wire";
 import { SITE } from "@/lib/site";
+import { IconArrowRight } from "@/components/icons";
 
 export const dynamic = "force-dynamic";
 
-const PER_PAGE = 20;
+const PER_PAGE = 12;
+
+const COUNTRY_SECTIONS = [
+  "politics",
+  "business",
+  "security",
+  "economy",
+  "culture",
+  "sports",
+  "society",
+] as const;
 
 type Params = { params: Promise<{ slug: string }>; searchParams: Promise<{ page?: string }> };
 
-/**
- * One slug space serves countries and desks, so a request could be either.
- * Countries win: they are the platform's primary axis, and no desk shares a
- * slug with one.
- */
 async function resolve(slug: string) {
   const [country, category] = await Promise.all([
     db.country.findUnique({
@@ -36,7 +58,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     return {
       title: "Horn of Africa — Regional Coverage",
       description:
-        "Headlines from across Somalia, Ethiopia, Djibouti and Eritrea, gathered from the newsrooms covering the region.",
+        "Stories that involve more than one country of the Horn: relations, the Red Sea, trade corridors, ports, migration and regional diplomacy.",
       alternates: { canonical: `${SITE.url}/horn` },
     };
   }
@@ -53,8 +75,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   if (category) {
     return {
       title: category.name,
-      description:
-        category.blurb ?? `${category.name} headlines from across the Horn of Africa.`,
+      description: category.blurb ?? `${category.name} coverage from across the Horn of Africa.`,
       alternates: { canonical: `${SITE.url}/${slug}` },
     };
   }
@@ -69,135 +90,296 @@ export default async function SectionPage({ params, searchParams }: Params) {
   if (slug === "horn") return <HornPage page={page} skip={skip} />;
 
   const { country, category } = await resolve(slug);
-  if (country) return <CountryPage page={page} skip={skip} country={country} />;
-  if (category) return <DeskPage category={category} page={page} skip={skip} />;
+  if (country) return <CountryPage slug={slug} page={page} skip={skip} country={country} />;
+  if (category) return <CategoryPage category={category} page={page} skip={skip} />;
 
   notFound();
 }
 
 // ---------------------------------------------------------------------------
-// Country landing page
+// Country landing page (spec §8)
 // ---------------------------------------------------------------------------
 
 async function CountryPage({
+  slug,
   page,
   skip,
   country,
 }: {
+  slug: string;
   page: number;
   skip: number;
   country: NonNullable<Awaited<ReturnType<typeof resolve>>["country"]>;
 }) {
-  const slug = country.slug;
-
-  const [items, total, deskCounts, sources] = await Promise.all([
-    getWire({ country: slug, take: PER_PAGE, skip }),
-    countWire({ country: slug }),
-    getTopicCounts(slug),
-    getWireSources(),
+  const [articles, total, trending, videos, wire] = await Promise.all([
+    getByCountry(slug, { take: PER_PAGE, skip }),
+    countByCountry(slug),
+    getTrending("week", 5),
+    getVideos(3),
+    getWire({ country: slug, take: 6 }),
   ]);
 
-  // Outlets whose beat is this country, so a reader can see who the coverage
-  // is actually coming from — and, for the countries where every reachable
-  // outlet is state-run or partisan, judge it accordingly.
-  const countrySources = sources.filter((s) => s.country?.slug === slug);
+  const [lead, ...rest] = page === 1 ? articles : [null, ...articles];
+
+  // Section rails only render where the country actually has coverage, so a
+  // country page never shows a row of empty headings.
+  const sections = await Promise.all(
+    COUNTRY_SECTIONS.map(async (s) => ({
+      slug: s,
+      items: await getByCountry(slug, { take: 3, category: s, exclude: lead ? [lead.id] : [] }),
+    })),
+  );
+  const liveSections = sections.filter((s) => s.items.length > 0);
 
   return (
-    <WireListPage
-      eyebrow="Country"
-      title={`${country.name} News`}
-      blurb={country.blurb}
-      accent={country.accent}
-      countrySlug={slug}
-      meta={
-        <span className="text-[0.8rem] text-ink-mute">
-          Capital: {country.capital}
-          {country.nativeName ? ` · ${country.nativeName}` : ""} · {total} headlines
-        </span>
-      }
-      headerExtra={<DeskStrip counts={deskCounts} basePath={`/${slug}`} />}
-      items={items}
-      total={total}
-      page={page}
-      perPage={PER_PAGE}
-      basePath={`/${slug}`}
-      emptyNote={`No headlines mentioning ${country.name} have come through the wire recently. The feeds are checked every hour.`}
-      sidebar={
-        <>
-          {countrySources.length > 0 && (
-            <div className="border border-rule bg-white p-4">
-              <p className="mb-2.5 text-[0.68rem] font-extrabold uppercase tracking-[0.13em] text-ink-mute">
-                {country.name} outlets on the wire
-              </p>
-              <ul className="space-y-1.5">
-                {countrySources.map((s) => (
-                  <li key={s.slug}>
-                    <Link
-                      href={`/wire?source=${s.slug}`}
-                      className="text-[0.85rem] font-semibold text-ink-soft hover:text-brand"
-                    >
-                      {s.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+    <div className="shell py-6">
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: country.name }]} />
+
+      <PageHeader
+        eyebrow="Country"
+        title={`${country.name} News`}
+        blurb={country.blurb}
+        accent={country.accent}
+        countrySlug={country.slug}
+        meta={
+          <span className="text-[0.8rem] text-ink-mute">
+            Capital: {country.capital}
+            {country.nativeName ? ` · ${country.nativeName}` : ""} · {total} articles
+          </span>
+        }
+      >
+        <div className="mt-4 flex flex-wrap gap-2">
+          {COUNTRY_SECTIONS.map((s) => (
+            <Link
+              key={s}
+              href={`/${slug}/${s}`}
+              className="border border-rule-strong px-3 py-1.5 text-[0.74rem] font-bold uppercase tracking-[0.05em] transition-colors hover:border-ink hover:bg-ink hover:text-white"
+            >
+              {s}
+            </Link>
+          ))}
+        </div>
+      </PageHeader>
+
+      {/* Regional breakdown (spec §8). New regions appear here automatically. */}
+      {country.regions.length > 0 && (
+        <section className="mt-6 border border-rule bg-white p-4">
+          <p className="mb-2.5 text-[0.68rem] font-extrabold uppercase tracking-[0.13em] text-ink-mute">
+            Regions of {country.name}
+          </p>
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
+            {country.regions.map((r) => (
+              <Link
+                key={r.slug}
+                href={`/${slug}/regions/${r.slug}`}
+                className="text-[0.86rem] font-semibold text-ink-soft hover:text-brand"
+              >
+                {r.name}
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <div className="mt-7 grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div>
+          {lead && (
+            <div className="mb-8">
+              <HeroCard article={lead} />
             </div>
           )}
 
-          {country.regions.length > 0 && (
-            <div className="border border-rule bg-white p-4">
-              <p className="mb-2.5 text-[0.68rem] font-extrabold uppercase tracking-[0.13em] text-ink-mute">
-                Regions of {country.name}
-              </p>
-              <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-                {country.regions.map((r) => (
-                  <span key={r.slug} className="text-[0.83rem] text-ink-soft">
-                    {r.name}
-                  </span>
+          <SectionHead title={`Latest from ${country.name}`} light />
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {rest.filter(Boolean).map((a) => (
+              <StackedCard key={a!.id} article={a!} />
+            ))}
+          </div>
+
+          <Pagination page={page} total={total} perPage={PER_PAGE} basePath={`/${slug}`} />
+
+          {page === 1 &&
+            liveSections.map(({ slug: s, items }) => (
+              <section key={s} className="mt-10">
+                <SectionHead
+                  title={`${country.name} ${s}`}
+                  href={`/${slug}/${s}`}
+                  light
+                />
+                <div className="grid gap-6 sm:grid-cols-3">
+                  {items.map((a) => (
+                    <StackedCard key={a.id} article={a} imageHeight="h-[140px]" showDeck={false} />
+                  ))}
+                </div>
+              </section>
+            ))}
+        </div>
+
+        <aside className="space-y-6">
+          <div className="card p-4">
+            <div className="section-head section-head--light mb-3.5 pb-2.5">
+              <h2 className="section-title text-[0.92rem]">Trending Now</h2>
+            </div>
+            <ol className="space-y-3">
+              {trending.map((a, i) => (
+                <TrendingItem key={a.id} article={a} rank={i + 1} />
+              ))}
+            </ol>
+          </div>
+
+          <WireRail
+            items={wire}
+            title={`${country.name} on the Wire`}
+            href={`/wire?country=${slug}`}
+            note={`What other newsrooms are publishing about ${country.name}. Links open at the publisher.`}
+          />
+
+          <div className="panel p-5">
+            <h2 className="text-[1rem] font-extrabold uppercase tracking-[0.05em]">
+              {country.name} Briefing
+            </h2>
+            <p className="mt-1.5 text-[0.83rem] leading-relaxed text-white/70">
+              Get the {country.name} edition of The Horn Daily.
+            </p>
+            <div className="mt-3.5">
+              <NewsletterForm variant="dark" defaultCountry={slug} showCountry />
+            </div>
+          </div>
+
+          {videos.length > 0 && (
+            <div>
+              <SectionHead title="Videos" href="/videos" light />
+              <div className="space-y-4">
+                {videos.map((v) => (
+                  <Link key={v.id} href={`/videos/${v.slug}`} className="block">
+                    <h3 className="hl clamp-2 text-[0.9rem]">{v.title}</h3>
+                    <p className="meta mt-1">{v.country?.name ?? "Horn of Africa"}</p>
+                  </Link>
                 ))}
               </div>
             </div>
           )}
-        </>
-      }
-    />
+
+          <AdSlot position="sidebar" />
+        </aside>
+      </div>
+    </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Desk page — the wire filtered to one subject
+// Category page
 // ---------------------------------------------------------------------------
 
-async function DeskPage({
+async function CategoryPage({
   category,
   page,
   skip,
 }: {
-  category: { slug: string; name: string; blurb: string | null };
+  category: { id: string; slug: string; name: string; blurb: string | null };
   page: number;
   skip: number;
 }) {
-  const [items, total, countries] = await Promise.all([
-    getWire({ topic: category.slug, take: PER_PAGE, skip }),
-    countWire({ topic: category.slug }),
-    db.country.findMany({ orderBy: { order: "asc" } }),
+  const [articles, total, subcategories, trending] = await Promise.all([
+    getByCategory(category.slug, { take: PER_PAGE, skip }),
+    countByCategory(category.slug),
+    db.subcategory.findMany({ where: { categoryId: category.id }, orderBy: { order: "asc" } }),
+    getTrending("week", 5),
   ]);
 
+  const [lead, ...rest] = page === 1 ? articles : [null, ...articles];
+
   return (
-    <WireListPage
-      eyebrow="Desk"
-      title={category.name}
-      blurb={
-        category.blurb ??
-        `${category.name} headlines from across Somalia, Ethiopia, Djibouti and Eritrea.`
-      }
-      meta={<span className="text-[0.8rem] text-ink-mute">{total} headlines</span>}
-      headerExtra={
+    <div className="shell py-6">
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: category.name }]} />
+
+      <PageHeader
+        eyebrow="Section"
+        title={category.name}
+        blurb={category.blurb}
+        meta={<span className="text-[0.8rem] text-ink-mute">{total} articles</span>}
+      >
+        {subcategories.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {subcategories.map((s) => (
+              <span
+                key={s.id}
+                className="border border-rule px-2.5 py-1 text-[0.72rem] font-semibold text-ink-soft"
+              >
+                {s.name}
+              </span>
+            ))}
+          </div>
+        )}
+      </PageHeader>
+
+      <div className="mt-7 grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div>
+          {lead && (
+            <div className="mb-8">
+              <HeroCard article={lead} />
+            </div>
+          )}
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {rest.filter(Boolean).map((a) => (
+              <StackedCard key={a!.id} article={a!} />
+            ))}
+          </div>
+          <Pagination
+            page={page}
+            total={total}
+            perPage={PER_PAGE}
+            basePath={`/${category.slug}`}
+          />
+        </div>
+
+        <aside className="space-y-6">
+          <div className="card p-4">
+            <div className="section-head section-head--light mb-3.5 pb-2.5">
+              <h2 className="section-title text-[0.92rem]">Trending Now</h2>
+            </div>
+            <ol className="space-y-3">
+              {trending.map((a, i) => (
+                <TrendingItem key={a.id} article={a} rank={i + 1} />
+              ))}
+            </ol>
+          </div>
+          <AdSlot position="sidebar" />
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Horn of Africa regional page (spec §10)
+// ---------------------------------------------------------------------------
+
+async function HornPage({ page, skip }: { page: number; skip: number }) {
+  const [articles, countries, trending, wire] = await Promise.all([
+    getHornRegional(PER_PAGE, skip),
+    db.country.findMany({ orderBy: { order: "asc" } }),
+    getTrending("month", 5),
+    getWire({ take: 6 }),
+  ]);
+  const total = (await getHornRegional(500, 0)).length;
+  const [lead, ...rest] = page === 1 ? articles : [null, ...articles];
+
+  return (
+    <div className="shell py-6">
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Horn of Africa" }]} />
+
+      <PageHeader
+        eyebrow="Regional"
+        title="Horn of Africa"
+        blurb="Stories that belong to more than one country: relations between the four states, the Red Sea, trade corridors and ports, migration, climate, and the regional bodies that bind them together. This is the coverage that treats the Horn as one region rather than four separate news beats."
+        meta={<span className="text-[0.8rem] text-ink-mute">{total} articles</span>}
+      >
         <div className="mt-4 flex flex-wrap gap-2">
           {countries.map((c) => (
             <Link
               key={c.slug}
-              href={`/${c.slug}/${category.slug}`}
+              href={`/${c.slug}`}
               className="flex items-center gap-1.5 border border-rule-strong px-3 py-1.5 text-[0.76rem] font-bold transition-colors hover:border-ink"
             >
               <CountryFlag slug={c.slug} />
@@ -205,57 +387,62 @@ async function DeskPage({
             </Link>
           ))}
         </div>
-      }
-      items={items}
-      total={total}
-      page={page}
-      perPage={PER_PAGE}
-      basePath={`/${category.slug}`}
-      emptyNote={`Nothing has been filed to the ${category.name.toLowerCase()} desk recently. Desks are assigned from the text of each headline, so a quiet desk usually means a quiet week rather than a fault.`}
-    />
-  );
-}
+      </PageHeader>
 
-// ---------------------------------------------------------------------------
-// Horn of Africa — everything, all four countries
-// ---------------------------------------------------------------------------
-
-async function HornPage({ page, skip }: { page: number; skip: number }) {
-  const [items, total, countries, deskCounts] = await Promise.all([
-    getWire({ take: PER_PAGE, skip }),
-    countWire(),
-    db.country.findMany({ orderBy: { order: "asc" } }),
-    getTopicCounts(),
-  ]);
-
-  return (
-    <WireListPage
-      eyebrow="Regional"
-      title="Horn of Africa"
-      blurb="Everything on the wire from the four countries of the Horn — Somalia, Ethiopia, Djibouti and Eritrea — newest first, whichever newsroom published it."
-      meta={<span className="text-[0.8rem] text-ink-mute">{total} headlines</span>}
-      headerExtra={
-        <>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {countries.map((c) => (
-              <Link
-                key={c.slug}
-                href={`/${c.slug}`}
-                className="flex items-center gap-1.5 border border-rule-strong px-3 py-1.5 text-[0.76rem] font-bold transition-colors hover:border-ink"
-              >
-                <CountryFlag slug={c.slug} />
-                {c.name}
-              </Link>
+      <div className="mt-7 grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div>
+          {lead && (
+            <div className="mb-8">
+              <HeroCard article={lead} />
+            </div>
+          )}
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {rest.filter(Boolean).map((a) => (
+              <StackedCard key={a!.id} article={a!} />
             ))}
           </div>
-          <DeskStrip counts={deskCounts} basePath="" />
-        </>
-      }
-      items={items}
-      total={total}
-      page={page}
-      perPage={PER_PAGE}
-      basePath="/horn"
-    />
+          <Pagination page={page} total={total} perPage={PER_PAGE} basePath="/horn" />
+        </div>
+
+        <aside className="space-y-6">
+          <div className="panel p-4">
+            <h2 className="text-[1rem] font-extrabold uppercase tracking-[0.06em]">
+              Explore the Horn
+            </h2>
+            <p className="mt-1 text-[0.8rem] text-white/65">Click a country to see news</p>
+            <div className="mt-2">
+              <HornMap />
+            </div>
+          </div>
+
+          <div className="card p-4">
+            <div className="section-head section-head--light mb-3.5 pb-2.5">
+              <h2 className="section-title text-[0.92rem]">Most Read This Month</h2>
+            </div>
+            <ol className="space-y-3">
+              {trending.map((a, i) => (
+                <TrendingItem key={a.id} article={a} rank={i + 1} />
+              ))}
+            </ol>
+          </div>
+
+          <WireRail
+            items={wire}
+            title="The Wire"
+            note="What other newsrooms are publishing about the Horn. Links open at the publisher."
+          />
+
+          <Link
+            href="/explained"
+            className="flex items-center justify-between border border-rule bg-white px-4 py-3 text-[0.85rem] font-bold hover:border-ink"
+          >
+            Read the Explainers
+            <IconArrowRight className="h-4 w-4" />
+          </Link>
+
+          <AdSlot position="sidebar" />
+        </aside>
+      </div>
+    </div>
   );
 }

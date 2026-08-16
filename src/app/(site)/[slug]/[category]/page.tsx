@@ -2,81 +2,153 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { countWire, getTopicCounts, getWire } from "@/lib/wire";
-import { DeskStrip, WireListPage } from "@/components/WireListPage";
+import { countByCountry, getByCountry, getHornRegional, getTrending } from "@/lib/queries";
+import { HeroCard, StackedCard, TrendingItem } from "@/components/cards";
+import { Breadcrumbs, PageHeader } from "@/components/PageHeader";
+import { Pagination } from "@/components/Pagination";
+import { AdSlot } from "@/components/AdSlot";
 import { SITE } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
-const PER_PAGE = 20;
+const PER_PAGE = 12;
 
 type Params = {
   params: Promise<{ slug: string; category: string }>;
   searchParams: Promise<{ page?: string }>;
 };
 
-async function resolve(slug: string, category: string) {
-  const [country, desk] = await Promise.all([
-    db.country.findUnique({ where: { slug } }),
-    db.category.findUnique({ where: { slug: category } }),
+async function resolve(slug: string, categorySlug: string) {
+  const [country, category] = await Promise.all([
+    slug === "horn"
+      ? null
+      : db.country.findUnique({ where: { slug } }),
+    db.category.findUnique({ where: { slug: categorySlug } }),
   ]);
-  return { country, desk };
+  return { country, category, isHorn: slug === "horn" };
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
-  const { slug, category } = await params;
-  const { country, desk } = await resolve(slug, category);
-  if (!country || !desk) return { title: "Not found" };
+  const { slug, category: categorySlug } = await params;
+  const { country, category, isHorn } = await resolve(slug, categorySlug);
+  if (!category || (!country && !isHorn)) return { title: "Not found" };
 
+  const place = country?.name ?? "Horn of Africa";
   return {
-    title: `${desk.name} — ${country.name}`,
-    description: `${desk.name} headlines about ${country.name}, gathered from the newsrooms covering the Horn of Africa.`,
-    alternates: { canonical: `${SITE.url}/${slug}/${category}` },
+    title: `${place} ${category.name}`,
+    description: `${category.name} news and analysis from ${place}. ${category.blurb ?? ""}`.trim(),
+    alternates: { canonical: `${SITE.url}/${slug}/${categorySlug}` },
   };
 }
 
-/** One country, one desk — the intersection of the two filters. */
-export default async function CountryDeskPage({ params, searchParams }: Params) {
-  const { slug, category } = await params;
+export default async function CountryCategoryPage({ params, searchParams }: Params) {
+  const { slug, category: categorySlug } = await params;
   const page = Math.max(1, Number((await searchParams).page ?? 1) || 1);
   const skip = (page - 1) * PER_PAGE;
 
-  const { country, desk } = await resolve(slug, category);
-  if (!country || !desk) notFound();
+  const { country, category, isHorn } = await resolve(slug, categorySlug);
+  if (!category) notFound();
+  if (!country && !isHorn) notFound();
 
-  const [items, total, deskCounts] = await Promise.all([
-    getWire({ country: slug, topic: category, take: PER_PAGE, skip }),
-    countWire({ country: slug, topic: category }),
-    getTopicCounts(slug),
+  const [articles, total, trending, siblings] = await Promise.all([
+    isHorn
+      ? getHornRegional(PER_PAGE, skip)
+      : getByCountry(slug, { take: PER_PAGE, skip, category: categorySlug }),
+    isHorn ? getHornRegional(500, 0).then((r) => r.length) : countByCountry(slug, categorySlug),
+    getTrending("week", 5),
+    db.category.findMany({ where: { kind: "DESK" }, orderBy: { order: "asc" } }),
   ]);
 
+  const place = country?.name ?? "Horn of Africa";
+  const accent = country?.accent;
+  const [lead, ...rest] = page === 1 ? articles : [null, ...articles];
+
   return (
-    <WireListPage
-      eyebrow={country.name}
-      title={`${desk.name} — ${country.name}`}
-      blurb={`${desk.name} headlines about ${country.name}. Every item links to the newsroom that published it.`}
-      accent={country.accent}
-      countrySlug={country.slug}
-      meta={<span className="text-[0.8rem] text-ink-mute">{total} headlines</span>}
-      headerExtra={
-        <>
-          <DeskStrip counts={deskCounts} basePath={`/${slug}`} current={category} />
-          <p className="mt-3 text-[0.82rem]">
+    <div className="shell py-6">
+      <Breadcrumbs
+        items={[
+          { label: "Home", href: "/" },
+          { label: place, href: `/${slug}` },
+          { label: category.name },
+        ]}
+      />
+
+      <PageHeader
+        eyebrow={place}
+        title={`${place} ${category.name}`}
+        blurb={category.blurb}
+        accent={accent}
+        countrySlug={country?.slug}
+        meta={<span className="text-[0.8rem] text-ink-mute">{total} articles</span>}
+      >
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link
+            href={`/${slug}`}
+            className="border border-rule-strong px-3 py-1.5 text-[0.74rem] font-bold uppercase tracking-[0.05em] transition-colors hover:border-ink"
+          >
+            All {place}
+          </Link>
+          {siblings.map((s) => (
             <Link
-              href={`/${slug}`}
-              className="font-semibold text-brand hover:underline"
+              key={s.slug}
+              href={`/${slug}/${s.slug}`}
+              className={`border px-3 py-1.5 text-[0.74rem] font-bold uppercase tracking-[0.05em] transition-colors ${
+                s.slug === categorySlug
+                  ? "border-ink bg-ink text-white"
+                  : "border-rule-strong hover:border-ink"
+              }`}
             >
-              ← All {country.name} headlines
+              {s.name}
             </Link>
-          </p>
-        </>
-      }
-      items={items}
-      total={total}
-      page={page}
-      perPage={PER_PAGE}
-      basePath={`/${slug}/${category}`}
-      emptyNote={`Nothing filed to the ${desk.name.toLowerCase()} desk about ${country.name} recently. Try the other desks above, or all ${country.name} headlines.`}
-    />
+          ))}
+        </div>
+      </PageHeader>
+
+      <div className="mt-7 grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div>
+          {articles.length === 0 ? (
+            <p className="border border-rule bg-white p-8 text-center text-[0.95rem] text-ink-soft">
+              No {category.name.toLowerCase()} stories from {place} yet.{" "}
+              <Link href={`/${slug}`} className="font-bold text-brand">
+                See all {place} news →
+              </Link>
+            </p>
+          ) : (
+            <>
+              {lead && (
+                <div className="mb-8">
+                  <HeroCard article={lead} />
+                </div>
+              )}
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {rest.filter(Boolean).map((a) => (
+                  <StackedCard key={a!.id} article={a!} />
+                ))}
+              </div>
+              <Pagination
+                page={page}
+                total={total}
+                perPage={PER_PAGE}
+                basePath={`/${slug}/${categorySlug}`}
+              />
+            </>
+          )}
+        </div>
+
+        <aside className="space-y-6">
+          <div className="card p-4">
+            <div className="section-head section-head--light mb-3.5 pb-2.5">
+              <h2 className="section-title text-[0.92rem]">Trending Now</h2>
+            </div>
+            <ol className="space-y-3">
+              {trending.map((a, i) => (
+                <TrendingItem key={a.id} article={a} rank={i + 1} />
+              ))}
+            </ol>
+          </div>
+          <AdSlot position="sidebar" />
+        </aside>
+      </div>
+    </div>
   );
 }
