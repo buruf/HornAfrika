@@ -33,7 +33,13 @@ import {
   getWireFreshness,
   spreadSources,
 } from "@/lib/wire";
-import { WireBand, WireHero, WireLink, WireRail } from "@/components/wire";
+import {
+  WireBand,
+  WireCard,
+  WireHero,
+  WireLink,
+  WireRail,
+} from "@/components/wire";
 import { articleHref, formatDuration, timeAgo } from "@/lib/format";
 import { IconArrowRight, IconPlay, IconTrend } from "@/components/icons";
 
@@ -124,6 +130,17 @@ export default async function HomePage() {
   for (const items of wireByCountry.values()) for (const i of items) taken.add(i.id);
 
   const wireRail = claim(wirePool, 5);
+
+  // A full-width grid under the country blocks. Balanced too, so the biggest
+  // block of the page is not eight Somali headlines in a row.
+  const latestWire = spreadSources(
+    balanceByCountry(
+      wirePool.filter((i) => !taken.has(i.id)),
+      8,
+      countrySlugs,
+    ),
+  );
+  for (const i of latestWire) taken.add(i.id);
 
   // Desk rows, drawn from the same pool. A desk with nothing left after the
   // bands above have taken their share is dropped rather than shown empty.
@@ -312,6 +329,16 @@ export default async function HomePage() {
                   </Link>
                 )}
 
+                {(wireByCountry.get(country.slug)?.length ?? 0) > 0 && (
+                  <div className="px-3 pt-3">
+                    <WireCard
+                      item={wireByCountry.get(country.slug)![0]}
+                      imageHeight="h-[120px]"
+                      showExcerpt={false}
+                    />
+                  </div>
+                )}
+
                 {(cLead || rest.length > 0) && (
                   <ul className="space-y-2 px-3 py-3">
                     {cLead && <BulletItem article={cLead} />}
@@ -329,10 +356,10 @@ export default async function HomePage() {
                 {(wireByCountry.get(country.slug)?.length ?? 0) > 0 && (
                   <div className="border-t border-rule bg-shell px-3 py-3">
                     <p className="mb-2 text-[0.62rem] font-extrabold uppercase tracking-[0.1em] text-ink-mute">
-                      Today on the wire
+                      More on the wire
                     </p>
                     <ul className="space-y-2.5">
-                      {wireByCountry.get(country.slug)!.map((item) => (
+                      {wireByCountry.get(country.slug)!.slice(1).map((item) => (
                         <li key={item.id}>
                           <a
                             href={item.url}
@@ -437,6 +464,26 @@ export default async function HomePage() {
         </aside>
       </div>
 
+      {/* -------------------------------------------------------------- Latest
+          A full-width grid of cards. The article version of this section went
+          when the articles did, and nothing replaced it, which is most of why
+          the page felt short. */}
+      {latestWire.length > 0 && (
+        <section className="mt-9">
+          <SectionHead
+            title="Latest"
+            href="/latest"
+            hrefLabel="All"
+            note="Newest headlines from across the Horn — links open at the publisher"
+          />
+          <div className="grid gap-x-7 gap-y-7 sm:grid-cols-2 lg:grid-cols-4">
+            {latestWire.map((item) => (
+              <WireCard key={item.id} item={item} />
+            ))}
+          </div>
+        </section>
+      )}
+
       <AdSlot position="homepage-mid" className="mt-9" />
 
       {/* ------------------------------------------------------------------
@@ -460,7 +507,7 @@ export default async function HomePage() {
           />
           <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
             {items.map((item) => (
-              <WireLink key={item.id} item={item} showExcerpt={false} showImage />
+              <WireCard key={item.id} item={item} showExcerpt={false} />
             ))}
           </div>
         </section>

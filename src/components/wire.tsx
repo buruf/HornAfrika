@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EditorialImage } from "@/components/EditorialImage";
 import { timeAgo } from "@/lib/format";
 import type { WireCardItem } from "@/lib/wire";
 
@@ -10,9 +11,20 @@ import type { WireCardItem } from "@/lib/wire";
  *  - we show an excerpt, never a body;
  *  - the surrounding block always says these are links to other newsrooms.
  *
- * The visual language is deliberately different from our own cards — no image,
- * a left rule instead of a chip — so a reader can tell at a glance which is
- * Hornafrika reporting and which is a link out.
+ * These four rules are the whole contract, and they are all explicit markings.
+ *
+ * There used to be a fifth, unwritten one: make it visually weaker than our
+ * own cards — no picture, a left rule instead of a chip, small type — so the
+ * difference was obvious at a glance. That worked while the wire was a rail
+ * beside real article cards. Once the articles were retired the wire became
+ * the entire site, and the whole front page inherited the subordinate styling:
+ * every headline at 14px, pictures under a tenth of the page. It read as thin,
+ * because it was designed to.
+ *
+ * So the weakness is gone and the markings stay. `WireCard` is a full card for
+ * where the wire is the main event; `WireLink` remains for rails and dense
+ * lists. When real reporting returns it will stand out by carrying a byline
+ * and staying on the site, not by everything else being quiet.
  */
 
 /**
@@ -193,29 +205,29 @@ export function WireRow({ item }: { item: WireCardItem }) {
       </div>
       </div>
 
-      {/* The publisher's own thumbnail, hotlinked rather than copied — the
-          same posture as the headline. Decorative: it carries nothing the
-          headline does not, so it is hidden from screen readers and the link
-          beside it stands alone. Roughly half of items have one, and the
-          column simply collapses when they do not. */}
-      {item.imageUrl && (
-        <a
-          href={item.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          tabIndex={-1}
-          aria-hidden
-          className="order-first block overflow-hidden bg-shell sm:order-none"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={item.imageUrl}
-            alt=""
-            loading="lazy"
-            className="h-[130px] w-full object-cover transition-transform duration-500 hover:scale-[1.04] sm:h-[110px]"
-          />
-        </a>
-      )}
+      {/* The publisher's own thumbnail where the feed offers one, hotlinked
+          rather than copied — the same posture as the headline. Where it does
+          not, the deterministic editorial graphic stands in, so a list of
+          twenty headlines is not half pictures and half gaps. Decorative
+          either way: it carries nothing the headline does not, so it is hidden
+          from screen readers and the link beside it stands alone. */}
+      <a
+        href={item.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        tabIndex={-1}
+        aria-hidden
+        className="order-first block overflow-hidden bg-shell sm:order-none"
+      >
+        <EditorialImage
+          seed={item.id}
+          category={item.topic ?? "default"}
+          src={item.imageUrl}
+          alt=""
+          detail={false}
+          className="h-[130px] w-full object-cover transition-transform duration-500 hover:scale-[1.04] sm:h-[120px]"
+        />
+      </a>
     </article>
   );
 }
@@ -245,6 +257,88 @@ export function WireNotice({ compact = false }: { compact?: boolean }) {
         How the wire works
       </Link>
     </p>
+  );
+}
+
+/**
+ * A full card for a wire item: picture, outlet, headline, extract.
+ *
+ * The wire's other presentations are deliberately quiet — a left rule, no
+ * picture, small type — so that a link out could never be mistaken for our own
+ * reporting sitting beside it. That was the right call when the wire was a
+ * rail next to article cards. It became the wrong one the moment the wire
+ * became the entire site: every headline on the page rendered at 14px with no
+ * image, and the site read as thin.
+ *
+ * So aggregation gets a proper card now that aggregation is the product. What
+ * keeps it honest is not visual weakness but explicit marking — the outlet is
+ * named above the headline, the arrow says it leaves the site, and the section
+ * around it carries the standing notice. When real reporting returns it will
+ * be the thing that stands out, because it will carry a byline and stay on the
+ * site.
+ *
+ * About half of wire items have a picture. The rest fall back to the same
+ * deterministic editorial graphic used elsewhere on the site — abstract, never
+ * a stand-in photograph of an event that we do not have a photograph of.
+ */
+export function WireCard({
+  item,
+  imageHeight = "h-[168px]",
+  showExcerpt = true,
+}: {
+  item: WireCardItem;
+  imageHeight?: string;
+  showExcerpt?: boolean;
+}) {
+  return (
+    <article className="group/card flex flex-col">
+      <a
+        href={item.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        tabIndex={-1}
+        aria-hidden
+        className="block overflow-hidden bg-shell"
+      >
+        <EditorialImage
+          seed={item.id}
+          category={item.topic ?? "default"}
+          src={item.imageUrl}
+          alt=""
+          detail={false}
+          className={`${imageHeight} w-full object-cover transition-transform duration-500 group-hover/card:scale-[1.04]`}
+        />
+      </a>
+
+      <div className="mt-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <Credit
+          item={item}
+          className="text-[0.68rem] font-extrabold uppercase tracking-[0.07em] text-brand"
+        />
+        {item.source.stateAffiliated && <StateTag />}
+        <span className="meta">{timeAgo(item.publishedAt)}</span>
+      </div>
+
+      <a
+        href={item.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group mt-1 block"
+      >
+        <h3 className="clamp-3 text-[1.02rem] font-extrabold leading-[1.24] tracking-[-0.01em] group-hover:text-brand">
+          {item.title}
+          <span className="ml-1 text-[0.76rem] font-normal text-ink-mute" aria-hidden>
+            ↗
+          </span>
+        </h3>
+      </a>
+
+      {showExcerpt && item.excerpt && (
+        <p className="clamp-2 mt-1.5 text-[0.85rem] leading-relaxed text-ink-soft">
+          {item.excerpt}
+        </p>
+      )}
+    </article>
   );
 }
 
@@ -282,26 +376,25 @@ function CountryChips({ item }: { item: WireCardItem }) {
 export function WireHero({ item }: { item: WireCardItem }) {
   return (
     <article className="grid gap-5 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] md:items-start">
-      {item.imageUrl && (
-        <a
-          href={item.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          tabIndex={-1}
-          aria-hidden
-          className="block overflow-hidden bg-shell"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={item.imageUrl}
-            alt=""
-            loading="eager"
-            className="h-[210px] w-full object-cover transition-transform duration-500 hover:scale-[1.03] sm:h-[280px]"
-          />
-        </a>
-      )}
+      <a
+        href={item.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        tabIndex={-1}
+        aria-hidden
+        className="block overflow-hidden bg-shell"
+      >
+        <EditorialImage
+          seed={item.id}
+          category={item.topic ?? "default"}
+          src={item.imageUrl}
+          alt=""
+          priority
+          className="h-[240px] w-full object-cover transition-transform duration-500 hover:scale-[1.03] sm:h-[340px]"
+        />
+      </a>
 
-      <div className={item.imageUrl ? "" : "md:col-span-2"}>
+      <div>
         <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
           <a
             href={item.source.homepageUrl}
@@ -403,22 +496,14 @@ export function WireBand({
           </div>
         </div>
 
-        {[0, 1, 2].map((col) => {
-          const slice = rest.slice(2 + col * 3, 2 + col * 3 + 3);
-          if (slice.length === 0) return null;
-          return (
-            <div key={col} className="space-y-4 border-t border-rule pt-3">
-              {slice.map((item) => (
-                <div key={item.id}>
-                  <WireLink item={item} showExcerpt={false} />
-                  <div className="mt-1.5 flex flex-wrap gap-1.5 pl-3">
-                    <CountryChips item={item} />
-                  </div>
-                </div>
-              ))}
+        {rest.slice(2).map((item) => (
+          <div key={item.id} className="border-t border-rule pt-3">
+            <WireCard item={item} imageHeight="h-[132px]" showExcerpt={false} />
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              <CountryChips item={item} />
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
 
       <p className="mt-4 border-t border-rule pt-3 text-[0.76rem] leading-relaxed text-ink-mute">
