@@ -50,8 +50,16 @@ export function HeroSlider({
   if (slides.length === 1) return <>{slides[0]}</>;
 
   return (
+    // h-full, and grid on each slide, because the hero card is sized by its
+    // parent and nothing else. In fill mode HeroCard is min-h-0 above md and
+    // positions both its picture and its text absolutely, so it has no
+    // in-flow height of its own — it was relying on being a direct grid child
+    // and stretching to the row. Wrapping it here broke that chain and the
+    // hero collapsed to zero, leaving a 500px blank where the lead had been.
+    // Grid rather than flex: a single grid item stretches on both axes, and a
+    // flex item would have shrunk to its content width, which is also zero.
     <div
-      className="group/slider relative isolate"
+      className="group/slider relative isolate h-full"
       onMouseEnter={() => (pausedRef.current = true)}
       onMouseLeave={() => (pausedRef.current = false)}
       onFocusCapture={() => (pausedRef.current = true)}
@@ -64,7 +72,7 @@ export function HeroSlider({
           key={i}
           // Kept mounted rather than unmounted: the hero is the largest image
           // on the page and remounting it re-triggers a load on every advance.
-          className={i === index ? "block" : "hidden"}
+          className={i === index ? "grid h-full" : "hidden"}
           aria-hidden={i !== index}
         >
           {slide}
