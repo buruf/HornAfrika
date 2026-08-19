@@ -28,7 +28,8 @@ import {
   getVideos,
 } from "@/lib/queries";
 import { balanceByCountry, getWire, spreadSources } from "@/lib/wire";
-import { WireRail, WireRow, WireTextItem } from "@/components/wire";
+import { WireHeroSlide, WireRail, WireRow, WireTextItem } from "@/components/wire";
+import { HeroSlider } from "@/components/HeroSlider";
 import { articleHref, formatDuration } from "@/lib/format";
 import { IconArrowRight, IconPlay, IconTrend } from "@/components/icons";
 
@@ -106,6 +107,27 @@ export default async function HomePage() {
   const wireMain = claim(12);
   const wireRail = claim(5);
 
+  /**
+   * The hero rotates now, because it did not before.
+   *
+   * The lead was pinned to a homepage slot, so the same headline sat at the
+   * top of the site for days at a time — the single loudest signal that
+   * nothing here was moving. The editor's choice still leads, and the rest of
+   * the carousel is the freshest wire material that carries a picture, so the
+   * top of the page turns over with the news instead of with the CMS.
+   *
+   * Only items with a real photograph qualify: the hero is full-bleed, and the
+   * fallback graphic that works at card size does not carry a 2.6rem headline.
+   */
+  const heroWire = spreadSources(
+    balanceByCountry(
+      wirePool.filter((i) => i.imageUrl && !claimed.has(i.id)),
+      4,
+      countrySlugs,
+    ),
+  );
+  for (const i of heroWire) claimed.add(i.id);
+
   const peopleFeature = slots.get("people-feature");
   // Wider now that Latest sits in the main column across two or three columns.
   const latestColumn = latest.filter((a) => !usedIds.has(a.id));
@@ -172,7 +194,12 @@ export default async function HomePage() {
           edge lines up straight down the page.
       ================================================================== */}
       <section className="grid gap-5 md:grid-cols-[minmax(0,1.72fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1.72fr)_minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1.72fr)_minmax(0,1fr)_340px]">
-        {lead && <HeroCard article={lead} fill />}
+        <HeroSlider>
+          {[
+            lead ? <HeroCard key="lead" article={lead} fill /> : null,
+            ...heroWire.map((item) => <WireHeroSlide key={item.id} item={item} />),
+          ].filter(Boolean)}
+        </HeroSlider>
 
         <div className="grid gap-5 sm:grid-cols-2 md:min-h-[500px] md:grid-cols-1 md:grid-rows-3">
           {secondaries.map((a) => (

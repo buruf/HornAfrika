@@ -7,6 +7,7 @@ import {
   getWire,
   getWireFreshness,
   getWireSources,
+  type WireScope,
 } from "@/lib/wire";
 import { WireNotice, WireRow } from "@/components/wire";
 import { Breadcrumbs, PageHeader } from "@/components/PageHeader";
@@ -38,11 +39,25 @@ export const metadata: Metadata = {
 export default async function WirePage({
   searchParams,
 }: {
-  searchParams: Promise<{ country?: string; source?: string; kind?: string; page?: string }>;
+  searchParams: Promise<{
+    scope?: string;
+    country?: string;
+    source?: string;
+    kind?: string;
+    page?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.page ?? 1) || 1);
-  const filters = { country: sp.country, source: sp.source, kind: sp.kind };
+  // World is everything the Horn filter excludes. A country filter is
+  // meaningless there, so switching scope drops it.
+  const scope: WireScope = sp.scope === "world" ? "world" : "horn";
+  const filters = {
+    scope,
+    country: scope === "world" ? undefined : sp.country,
+    source: sp.source,
+    kind: sp.kind,
+  };
 
   const [rawItems, total, sources, countries, freshness] = await Promise.all([
     getWire({ ...filters, take: PER_PAGE, skip: (page - 1) * PER_PAGE }),
@@ -65,9 +80,10 @@ export default async function WirePage({
    * specific, and reordering would answer a different question. `/latest`
    * stays chronological throughout — that is the page that promises it.
    */
+  // Country balancing is a Horn idea; world items have no country to balance.
   const unfiltered = !filters.country && !filters.source && !filters.kind;
   const items =
-    unfiltered && page === 1
+    scope === "horn" && unfiltered && page === 1
       ? spreadSources(
           balanceByCountry(rawItems, rawItems.length, countries.map((c) => c.slug)),
         )
@@ -76,6 +92,9 @@ export default async function WirePage({
   const qs = (extra: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
     for (const [k, v] of Object.entries({ ...filters, ...extra })) {
+      // Horn is the default, so leaving it out keeps /wire canonical rather
+      // than serving the same page at both /wire and /wire?scope=horn.
+      if (k === "scope" && v === "horn") continue;
       if (v) p.set(k, v);
     }
     const s = p.toString();
@@ -114,6 +133,30 @@ export default async function WirePage({
       <div className="mt-6 space-y-2.5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[0.66rem] font-extrabold uppercase tracking-[0.12em] text-ink-mute">
+            Scope
+          </span>
+          <Link
+            href={qs({ scope: undefined, country: undefined, page: undefined })}
+            className={pill(scope === "horn")}
+          >
+            Horn of Africa
+          </Link>
+          <Link
+            href={qs({ scope: "world", country: undefined, page: undefined })}
+            className={pill(scope === "world")}
+          >
+            World
+          </Link>
+          <span className="text-[0.74rem] text-ink-mute">
+            {scope === "world"
+              ? "Everything else our sources filed — not about the Horn."
+              : "Headlines naming Somalia, Ethiopia, Djibouti or Eritrea."}
+          </span>
+        </div>
+
+        {scope === "horn" && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[0.66rem] font-extrabold uppercase tracking-[0.12em] text-ink-mute">
             Country
           </span>
           <Link href={qs({ country: undefined, page: undefined })} className={pill(!sp.country)}>
@@ -130,6 +173,7 @@ export default async function WirePage({
             </Link>
           ))}
         </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[0.66rem] font-extrabold uppercase tracking-[0.12em] text-ink-mute">

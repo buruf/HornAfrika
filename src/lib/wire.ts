@@ -69,7 +69,24 @@ const hornRelevant: Prisma.WireItemWhereInput = {
   countries: { some: {} },
 };
 
+/**
+ * The other side of that filter: everything the Horn rule excludes.
+ *
+ * These items were always fetched and stored, and until now nothing could
+ * reach them. That is a lot of live material — roughly 226 items a day, and
+ * crucially they keep arriving overnight when Horn newsrooms have stopped
+ * filing. Giving them an explicit "World" scope on /wire surfaces them without
+ * letting them anywhere near the Horn pages, which is what the original filter
+ * was protecting.
+ */
+const worldOnly: Prisma.WireItemWhereInput = {
+  countries: { none: {} },
+};
+
+export type WireScope = "horn" | "world";
+
 type WireFilter = {
+  scope?: WireScope;
   country?: string;
   source?: string;
   kind?: string;
@@ -77,10 +94,11 @@ type WireFilter = {
   excludeIds?: string[];
 };
 
-function wireWhere({ country, source, kind, topic, excludeIds }: WireFilter) {
+function wireWhere({ scope, country, source, kind, topic, excludeIds }: WireFilter) {
   return {
     ...visible,
-    ...hornRelevant,
+    // A country filter only means anything inside the Horn scope.
+    ...(scope === "world" ? worldOnly : hornRelevant),
     ...(country ? { countries: { some: { country: { slug: country } } } } : {}),
     ...(source ? { source: { slug: source } } : {}),
     ...(kind ? { source: { kind: kind as never } } : {}),

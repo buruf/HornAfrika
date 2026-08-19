@@ -14,7 +14,7 @@
  */
 
 import { PrismaClient } from "@prisma/client";
-import { resolveCountries } from "../src/lib/country-tagger";
+import { resolveItemCountries, stripDateline } from "../src/lib/country-tagger";
 import { detectTopic } from "../src/lib/topic-tagger";
 
 const db = new PrismaClient();
@@ -46,10 +46,10 @@ async function main() {
 
   for (const item of items) {
     const before = new Set(item.countries.map((c) => c.country.slug));
-    const { slugs, inherited } = resolveCountries(`${item.title} ${item.excerpt}`, {
+    const body = stripDateline(item.excerpt);
+    const { slugs, inherited } = resolveItemCountries(item.title, item.excerpt, {
       publisherCountry: item.source.country?.slug ?? null,
       publisherLocalOnly: item.source.localOnly,
-      hasExcerpt: item.excerpt.trim().length > 0,
     });
     if (inherited) inheritedCount++;
     const after = new Set(slugs.filter((s) => idBySlug.has(s)));
@@ -57,7 +57,7 @@ async function main() {
     const added = [...after].filter((s) => !before.has(s));
     const removed = [...before].filter((s) => !after.has(s));
 
-    const topic = detectTopic(`${item.title} ${item.excerpt}`);
+    const topic = detectTopic(`${item.title} ${body}`);
     topicTally[topic ?? "(none)"] = (topicTally[topic ?? "(none)"] ?? 0) + 1;
     if (topic !== item.topic) {
       topicChanged++;

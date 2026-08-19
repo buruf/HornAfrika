@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EditorialImage } from "@/components/EditorialImage";
 import { timeAgo } from "@/lib/format";
 import type { WireCardItem } from "@/lib/wire";
 
@@ -197,6 +198,75 @@ export function WireTextItem({ item }: { item: WireCardItem }) {
             ↗
           </span>
         </h3>
+      </a>
+    </article>
+  );
+}
+
+/**
+ * A wire headline dressed as a hero slide.
+ *
+ * Deliberately identical to HeroCard in cards.tsx — same gradient, same type
+ * scale, same padding — because it shares the hero carousel with real
+ * articles and a reader should not see the furniture change underneath them
+ * as it rotates.
+ *
+ * What does change is the attribution: the outlet's name replaces the category
+ * chip, the arrow marks the link out, and the credit line names whoever wrote
+ * it. Those are the markings that keep a link out from reading as our
+ * reporting, and they do not depend on the slide being visually weaker.
+ */
+export function WireHeroSlide({ item }: { item: WireCardItem }) {
+  return (
+    <article className="group relative isolate min-h-[330px] overflow-hidden bg-navy-deep sm:min-h-[400px] md:min-h-0">
+      <a
+        href={item.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block h-full"
+      >
+        <EditorialImage
+          seed={item.id}
+          category={item.topic ?? "default"}
+          src={item.imageUrl}
+          alt=""
+          priority
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+        />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/88 via-black/35 to-transparent" />
+
+        <div className="absolute inset-x-0 bottom-0 p-5 sm:p-7">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="bg-brand px-2 py-1 text-[0.62rem] font-extrabold uppercase tracking-[0.08em] text-white">
+              {item.originalPublisher ?? item.source.name}
+            </span>
+            {item.source.stateAffiliated && <StateTag />}
+            {item.countries.map(({ country }) => (
+              <span
+                key={country.slug}
+                className="border border-white/40 px-2 py-0.5 text-[0.62rem] font-bold uppercase tracking-[0.06em] text-white/85"
+              >
+                {country.name}
+              </span>
+            ))}
+          </div>
+          <h2 className="max-w-3xl text-[1.6rem] font-extrabold leading-[1.1] tracking-[-0.028em] text-white sm:text-[2.15rem] lg:text-[2.6rem]">
+            {item.title}
+            <span className="ml-2 text-[1.1rem] font-normal text-white/70" aria-hidden>
+              ↗
+            </span>
+          </h2>
+          {item.excerpt && (
+            <p className="clamp-2 mt-3 max-w-2xl text-[0.92rem] leading-relaxed text-white/80 sm:text-[1rem]">
+              {item.excerpt}
+            </p>
+          )}
+          <p className="mt-4 text-[0.78rem] text-white/65">
+            {timeAgo(item.publishedAt)}
+            <span className="mx-2 text-white/35">·</span>
+            Published by {item.originalPublisher ?? item.source.name}, not Hornafrika
+          </p>
+        </div>
       </a>
     </article>
   );

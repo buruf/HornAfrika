@@ -146,6 +146,32 @@ const TERM_PATTERNS: Record<string, RegExp[]> = Object.fromEntries(
   ]),
 );
 
+/**
+ * Remove a wire dateline from the start of an excerpt.
+ *
+ * A dateline says where the newsroom is sitting, not what the story is about.
+ * Fana opens every item with "Addis Ababa, August 18, 2026 (FMC) — ", so its
+ * report on a Colombian earthquake was filed under Ethiopia and reached the
+ * homepage hero. ENA, Reuters and AP copy carried by our sources all do the
+ * same thing.
+ *
+ * Only a leading dateline is stripped, and only when it has the full shape —
+ * a place, optionally a date, optionally an agency in brackets, closed by a
+ * dash. Requiring the dash is what stops this eating ordinary prose: a
+ * sentence that merely begins with a place name has no dash to end it.
+ *
+ * The cost is a genuinely local story whose only mention of the country is its
+ * own dateline. That is the right way round: an untagged Ethiopian item stays
+ * on the general wire, whereas a mistagged Colombian one claims the hero.
+ */
+export function stripDateline(text: string): string {
+  return text.replace(
+    // place [, date] [ (AGENCY) ] — rest.  The dash is required.
+    /^\s*\p{Lu}[\p{L}.' -]{1,40}(?:,\s*[\p{L}\d.,' -]{1,40})?\s*(?:\([\p{L}\d.\- ]{1,20}\))?\s*[—–]\s+/u,
+    "",
+  );
+}
+
 export function detectCountries(text: string): string[] {
   const hay = text.toLowerCase();
   const hits: string[] = [];
@@ -193,4 +219,50 @@ export function resolveCountries(
   if (mentionsElsewhere(text)) return { slugs: [], inherited: false };
 
   return { slugs: [publisherCountry], inherited: true };
+}
+
+/**
+ * Country tags for a stored item, given its headline and excerpt separately.
+ *
+ * The dateline is the awkward case. "Addis Ababa, August 18, 2026 (FMC) — "
+ * says where the newsroom sits, and Fana's report on a Colombian earthquake
+ * was filed under Ethiopia because of it, reaching the homepage hero.
+ *
+ * Simply deleting the dateline before tagging was tried and was worse. For
+ * Somali-language outlets the dateline is frequently the *only* thing in the
+ * item that names a place a Latin tagger recognises, so stripping it untagged
+ * fifteen genuine Horn stories — a released detainee, a speaker's first move
+ * after election, fighting in Tigray — to fix six wrong ones.
+ *
+ * So the dateline is discounted rather than removed:
+ *
+ *   - if the body names a Horn country on its own, the body decides;
+ *   - if it does not, but the body clearly places the story elsewhere on
+ *     earth, the dateline is ignored and the item is untagged;
+ *   - otherwise the dateline is the best evidence available and stands.
+ */
+export function resolveItemCountries(
+  title: string,
+  excerpt: string,
+  opts: {
+    publisherCountry?: string | null;
+    publisherLocalOnly?: boolean;
+  } = {},
+): { slugs: string[]; inherited: boolean } {
+  const body = stripDateline(excerpt);
+  const hasExcerpt = excerpt.trim().length > 0;
+
+  const fromBody = detectCountries(`${title} ${body}`);
+  if (fromBody.length > 0) return { slugs: fromBody, inherited: false };
+
+  // Nothing in the body. Does it place itself abroad?
+  if (mentionsElsewhere(`${title} ${body}`)) {
+    return { slugs: [], inherited: false };
+  }
+
+  // The dateline is now the only signal worth having.
+  const fromDateline = detectCountries(`${title} ${excerpt}`);
+  if (fromDateline.length > 0) return { slugs: fromDateline, inherited: false };
+
+  return resolveCountries(`${title} ${body}`, { ...opts, hasExcerpt });
 }

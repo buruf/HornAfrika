@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { parseFeed, type ParsedItem } from "@/lib/rss";
-import { detectCountries, resolveCountries } from "@/lib/country-tagger";
+import { detectCountries, resolveItemCountries, stripDateline } from "@/lib/country-tagger";
 import { detectTopic } from "@/lib/topic-tagger";
 
 /**
@@ -156,14 +156,13 @@ export async function fetchSource(
           imageUrl: item.imageUrl ?? null,
           originalPublisher: item.originalPublisher ?? null,
           publishedAt: item.publishedAt,
-          topic: detectTopic(`${item.title} ${item.excerpt}`),
+          topic: detectTopic(`${item.title} ${stripDateline(item.excerpt)}`),
         },
       });
 
-      const { slugs } = resolveCountries(`${item.title} ${item.excerpt}`, {
+      const { slugs } = resolveItemCountries(item.title, item.excerpt, {
         publisherCountry: source.countrySlug,
         publisherLocalOnly: source.localOnly,
-        hasExcerpt: item.excerpt.trim().length > 0,
       });
       const countryIds = new Set<string>();
       for (const slug of slugs) {
