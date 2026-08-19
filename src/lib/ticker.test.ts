@@ -118,3 +118,33 @@ describe("buildTickerItems", () => {
     expect(items).toEqual([]);
   });
 });
+
+describe("wire age cap", () => {
+  it("keeps day-old headlines out from under a Breaking News label", () => {
+    const items = buildTickerItems(
+      [],
+      [wire("Now", 1), wire("Yesterday", 26), wire("Also now", 2), wire("Recent", 4)],
+      { now: NOW },
+    );
+    expect(items.map((i) => i.headline)).toEqual(["Now", "Also now", "Recent"]);
+  });
+
+  it("relaxes the cap rather than showing an almost-empty strip", () => {
+    // Overnight the Horn newsrooms stop filing and the window can empty out.
+    const items = buildTickerItems([], [wire("Old A", 30), wire("Old B", 40)], {
+      now: NOW,
+    });
+    expect(items.map((i) => i.headline)).toEqual(["Old A", "Old B"]);
+  });
+
+  it("counts a live breaking flag toward the minimum", () => {
+    // One editor story plus two recent wire items clears the bar, so the cap
+    // stays on and the day-old item is still excluded.
+    const items = buildTickerItems(
+      [article("Ours", 1)],
+      [wire("Now", 1), wire("Also now", 2), wire("Yesterday", 30)],
+      { now: NOW },
+    );
+    expect(items.map((i) => i.headline)).toEqual(["Ours", "Now", "Also now"]);
+  });
+});

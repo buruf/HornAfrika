@@ -21,6 +21,20 @@ import type { TickerItem } from "@/components/BreakingTicker";
 export const BREAKING_TTL_HOURS = 24;
 
 /**
+ * How old a wire headline may be and still sit under a "Breaking News" label.
+ *
+ * Needed because the strip is balanced across the four countries, and Djibouti
+ * and Eritrea are thin: reaching for one of each dragged day-old headlines into
+ * a strip that claims to be breaking. A country with nothing inside the window
+ * simply does not appear, which is the same forfeiting rule the balancer uses.
+ */
+export const MAX_WIRE_AGE_HOURS = 18;
+
+/** Below this the strip looks broken, so the age cap is relaxed rather than
+ *  shipping an almost-empty banner. */
+const MIN_ITEMS = 3;
+
+/**
  * Dates arrive as strings when they have been through the cache.
  *
  * `getBreaking` is wrapped in `unstable_cache`, which serialises to JSON, so
@@ -51,9 +65,9 @@ type WireLike = {
 export function buildTickerItems(
   breaking: ArticleLike[],
   wire: WireLike[],
-  opts: { take?: number; now?: Date } = {},
+  opts: { take?: number; now?: Date; maxWireAgeHours?: number } = {},
 ): TickerItem[] {
-  const { take = 8, now = new Date() } = opts;
+  const { take = 8, now = new Date(), maxWireAgeHours = MAX_WIRE_AGE_HOURS } = opts;
   const cutoff = now.getTime() - BREAKING_TTL_HOURS * 3_600_000;
 
   const fresh = breaking.filter((a) => {
@@ -68,7 +82,16 @@ export function buildTickerItems(
 
   // The wire fills whatever the editor has not claimed. When something is
   // genuinely breaking the strip is ours; the rest of the time it is current.
-  for (const w of wire) {
+  const wireCutoff = now.getTime() - maxWireAgeHours * 3_600_000;
+  const recent = wire.filter((w) => {
+    const t = asTime(w.publishedAt);
+    return t !== null && t >= wireCutoff;
+  });
+  // Overnight the Horn newsrooms stop filing, so the window can empty out. A
+  // short strip of genuinely current headlines is fine; a bare one is not.
+  const usable = fresh.length + recent.length >= MIN_ITEMS ? recent : wire;
+
+  for (const w of usable) {
     if (items.length >= take) break;
     items.push({
       href: w.url,
