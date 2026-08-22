@@ -328,6 +328,129 @@ export function WireStackedCard({
 }
 
 /**
+ * Wire equivalents of OverlayCard, RowCard and BulletItem.
+ *
+ * Each matches its counterpart in cards.tsx line for line, so a section can
+ * fall back to the wire without the page changing shape. The one deliberate
+ * difference in every case: the outlet's name takes the category chip's slot,
+ * and the link carries the arrow. That is what keeps a link out from reading
+ * as our own reporting when the two sit side by side in the same grid.
+ */
+export function WireOverlayCard({
+  item,
+  height = "h-[152px]",
+  fill = false,
+}: {
+  item: WireCardItem;
+  height?: string;
+  fill?: boolean;
+}) {
+  return (
+    <article
+      className={`group relative isolate overflow-hidden bg-navy-deep ${
+        fill ? "min-h-[150px] md:min-h-0" : "self-start"
+      }`}
+    >
+      <a
+        href={item.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={fill ? "block h-full" : "block"}
+      >
+        <EditorialImage
+          seed={item.id}
+          category={item.topic ?? "default"}
+          src={item.imageUrl}
+          alt=""
+          detail={false}
+          className={
+            fill
+              ? "absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+              : `${height} w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]`
+          }
+        />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 p-3.5">
+          <span className="bg-brand px-2 py-0.5 text-[0.6rem] font-extrabold uppercase tracking-[0.07em] text-white">
+            {item.originalPublisher ?? item.source.name}
+          </span>
+          <h3 className="clamp-2 mt-2 text-[0.98rem] font-extrabold leading-[1.22] text-white">
+            {item.title}
+            <span className="ml-1 text-[0.72rem] font-normal text-white/70" aria-hidden>
+              ↗
+            </span>
+          </h3>
+          <p className="mt-1.5 text-[0.72rem] text-white/60">{timeAgo(item.publishedAt)}</p>
+        </div>
+      </a>
+    </article>
+  );
+}
+
+export function WireRowCard({ item }: { item: WireCardItem }) {
+  return (
+    <article className="group flex gap-3.5">
+      <a
+        href={item.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        tabIndex={-1}
+        aria-hidden
+        className="shrink-0 overflow-hidden bg-shell"
+      >
+        <EditorialImage
+          seed={item.id}
+          category={item.topic ?? "default"}
+          src={item.imageUrl}
+          alt=""
+          detail={false}
+          className="h-[74px] w-[104px] object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+        />
+      </a>
+      <div className="min-w-0">
+        <div className="mb-1 flex items-center gap-2">
+          <Credit
+            item={item}
+            className="text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-brand"
+          />
+        </div>
+        <a href={item.url} target="_blank" rel="noopener noreferrer">
+          <h3 className="hl clamp-2 text-[0.92rem]">
+            {item.title}
+            <span className="ml-1 text-[0.7rem] font-normal text-ink-mute" aria-hidden>
+              ↗
+            </span>
+          </h3>
+        </a>
+        <p className="meta mt-1">{timeAgo(item.publishedAt)}</p>
+      </div>
+    </article>
+  );
+}
+
+export function WireBulletItem({ item }: { item: WireCardItem }) {
+  return (
+    <li className="flex gap-2.5">
+      <span
+        className="mt-[0.55rem] h-[5px] w-[5px] shrink-0 rounded-full bg-brand"
+        aria-hidden
+      />
+      <a
+        href={item.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="hl clamp-2 text-[0.87rem] leading-[1.4]"
+      >
+        {item.title}
+        <span className="ml-1 text-[0.68rem] font-normal text-ink-mute" aria-hidden>
+          ↗
+        </span>
+      </a>
+    </li>
+  );
+}
+
+/**
  * A wire headline dressed as a hero slide.
  *
  * Deliberately identical to HeroCard in cards.tsx — same gradient, same type

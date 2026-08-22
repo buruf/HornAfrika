@@ -29,13 +29,18 @@ import {
 } from "@/lib/queries";
 import { balanceByCountry, getWire, getWireTrending, spreadSources } from "@/lib/wire";
 import {
+  WireBulletItem,
   WireHeroSlide,
+  WireOverlayCard,
+  WireRowCard,
+  WireStackedCard,
   WireRail,
   WireRow,
   WireTextItem,
   WireTrendingItem,
 } from "@/components/wire";
 import { HeroSlider } from "@/components/HeroSlider";
+import { fillWithWire, isFresh } from "@/lib/freshness";
 import { articleHref, formatDuration } from "@/lib/format";
 import { IconArrowRight, IconPlay, IconTrend } from "@/components/icons";
 
@@ -136,6 +141,24 @@ export default async function HomePage() {
   );
   for (const i of heroWire) claimed.add(i.id);
 
+  /**
+   * Our own writing takes any slot it is current enough to hold; the wire
+   * fills the rest.
+   *
+   * Every article surface on this page had frozen — the newest Article was ten
+   * days old and nothing publishes on a schedule, so Politics, Business,
+   * Security and the country blocks sat unchanged for a fortnight beside a
+   * wire that refreshes hourly. The design is untouched: each fallback renders
+   * in the same card as the article it replaces. Publish something and it
+   * takes its slot straight back, with no code change.
+   */
+  const sectionWire = wirePool.filter((i) => !claimed.has(i.id));
+  let sectionAt = 0;
+  const nextWire = (n: number) => sectionWire.slice(sectionAt, (sectionAt += n));
+
+  const fill = <A extends { publishedAt: Date | null }>(articles: A[], n: number) =>
+    fillWithWire(articles, nextWire(n), n);
+
   const peopleFeature = slots.get("people-feature");
   // Wider now that Latest sits in the main column across two or three columns.
   const latestColumn = latest.filter((a) => !usedIds.has(a.id));
@@ -204,15 +227,21 @@ export default async function HomePage() {
       <section className="grid gap-5 md:grid-cols-[minmax(0,1.72fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1.72fr)_minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1.72fr)_minmax(0,1fr)_340px]">
         <HeroSlider>
           {[
-            lead ? <HeroCard key="lead" article={lead} fill /> : null,
+            lead && isFresh(lead.publishedAt) ? (
+              <HeroCard key="lead" article={lead} fill />
+            ) : null,
             ...heroWire.map((item) => <WireHeroSlide key={item.id} item={item} />),
           ].filter(Boolean)}
         </HeroSlider>
 
         <div className="grid gap-5 sm:grid-cols-2 md:min-h-[500px] md:grid-cols-1 md:grid-rows-3">
-          {secondaries.map((a) => (
-            <OverlayCard key={a.id} article={a} fill />
-          ))}
+          {fill(secondaries, 3).map((slot) =>
+            slot.kind === "article" ? (
+              <OverlayCard key={slot.item.id} article={slot.item} fill />
+            ) : (
+              <WireOverlayCard key={slot.item.id} item={slot.item} fill />
+            ),
+          )}
         </div>
 
         <div className="card flex flex-col p-4 md:col-span-2 lg:col-span-1">
@@ -289,11 +318,16 @@ export default async function HomePage() {
                   </Link>
                 )}
 
+                {/* Falls back to the wire, so a country whose desk has been
+                    quiet still shows what is happening there today. */}
                 <ul className="space-y-2 px-3 py-3">
-                  {cLead && <BulletItem article={cLead} />}
-                  {rest.map((a) => (
-                    <BulletItem key={a.id} article={a} />
-                  ))}
+                  {fill([cLead, ...rest].filter(Boolean) as typeof rest, 4).map((slot) =>
+                    slot.kind === "article" ? (
+                      <BulletItem key={slot.item.id} article={slot.item} />
+                    ) : (
+                      <WireBulletItem key={slot.item.id} item={slot.item} />
+                    ),
+                  )}
                 </ul>
 
                 <div className="border-t border-rule px-3 py-2.5">
@@ -318,16 +352,29 @@ export default async function HomePage() {
               note="Stories that belong to more than one country"
               href="/horn"
             />
-            {horn.length > 0 && (
-              <div className="grid gap-6 md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-                <StackedCard article={horn[0]} imageHeight="h-[236px]" />
-                <div className="space-y-4">
-                  {horn.slice(1, 5).map((a) => (
-                    <RowCard key={a.id} article={a} />
-                  ))}
+            {(() => {
+              const slots = fill(horn, 5);
+              if (slots.length === 0) return null;
+              const [first, ...others] = slots;
+              return (
+                <div className="grid gap-6 md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+                  {first.kind === "article" ? (
+                    <StackedCard article={first.item} imageHeight="h-[236px]" />
+                  ) : (
+                    <WireStackedCard item={first.item} imageHeight="h-[236px]" />
+                  )}
+                  <div className="space-y-4">
+                    {others.map((slot) =>
+                      slot.kind === "article" ? (
+                        <RowCard key={slot.item.id} article={slot.item} />
+                      ) : (
+                        <WireRowCard key={slot.item.id} item={slot.item} />
+                      ),
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </section>
 
         </div>
@@ -401,18 +448,26 @@ export default async function HomePage() {
       <section className="mt-10">
         <SectionHead title="Politics" href="/politics" />
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {politics.map((a) => (
-            <StackedCard key={a.id} article={a} />
-          ))}
+          {fill(politics, 4).map((slot) =>
+            slot.kind === "article" ? (
+              <StackedCard key={slot.item.id} article={slot.item} />
+            ) : (
+              <WireStackedCard key={slot.item.id} item={slot.item} />
+            ),
+          )}
         </div>
       </section>
 
       <section className="mt-10">
         <SectionHead title="Business" href="/business" />
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {business.map((a) => (
-            <StackedCard key={a.id} article={a} />
-          ))}
+          {fill(business, 4).map((slot) =>
+            slot.kind === "article" ? (
+              <StackedCard key={slot.item.id} article={slot.item} />
+            ) : (
+              <WireStackedCard key={slot.item.id} item={slot.item} />
+            ),
+          )}
         </div>
       </section>
 
@@ -421,17 +476,30 @@ export default async function HomePage() {
           { title: "Security", href: "/security", items: security },
           { title: "Culture", href: "/culture", items: culture },
           { title: "Sports", href: "/sports", items: sports },
-        ].map(({ title, href, items }) => (
-          <div key={title}>
-            <SectionHead title={title} href={href} light />
-            {items[0] && <StackedCard article={items[0]} imageHeight="h-[152px]" />}
-            <div className="mt-4 space-y-4">
-              {items.slice(1).map((a) => (
-                <RowCard key={a.id} article={a} />
-              ))}
+        ].map(({ title, href, items }) => {
+          const slots = fill(items, 3);
+          const [first, ...others] = slots;
+          return (
+            <div key={title}>
+              <SectionHead title={title} href={href} light />
+              {first &&
+                (first.kind === "article" ? (
+                  <StackedCard article={first.item} imageHeight="h-[152px]" />
+                ) : (
+                  <WireStackedCard item={first.item} imageHeight="h-[152px]" />
+                ))}
+              <div className="mt-4 space-y-4">
+                {others.map((slot) =>
+                  slot.kind === "article" ? (
+                    <RowCard key={slot.item.id} article={slot.item} />
+                  ) : (
+                    <WireRowCard key={slot.item.id} item={slot.item} />
+                  ),
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </section>
 
       {/* ------------------------------------------------------------------
@@ -445,9 +513,21 @@ export default async function HomePage() {
             href="/explained"
           />
           <div className="grid gap-6 sm:grid-cols-2">
-            {explained.map((a) => (
-              <StackedCard key={a.id} article={a} imageHeight="h-[150px]" />
-            ))}
+            {fill(explained, 4).map((slot) =>
+              slot.kind === "article" ? (
+                <StackedCard
+                  key={slot.item.id}
+                  article={slot.item}
+                  imageHeight="h-[150px]"
+                />
+              ) : (
+                <WireStackedCard
+                  key={slot.item.id}
+                  item={slot.item}
+                  imageHeight="h-[150px]"
+                />
+              ),
+            )}
           </div>
         </div>
 
