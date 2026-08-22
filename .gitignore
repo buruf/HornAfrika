@@ -19,3 +19,6 @@ tsconfig.tsbuildinfo
 coverage/
 
 .vercel
+
+# Scratch files from scripted edits.
+._*
