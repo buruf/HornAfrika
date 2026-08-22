@@ -27,8 +27,14 @@ import {
   getTrending,
   getVideos,
 } from "@/lib/queries";
-import { balanceByCountry, getWire, spreadSources } from "@/lib/wire";
-import { WireHeroSlide, WireRail, WireRow, WireTextItem } from "@/components/wire";
+import { balanceByCountry, getWire, getWireTrending, spreadSources } from "@/lib/wire";
+import {
+  WireHeroSlide,
+  WireRail,
+  WireRow,
+  WireTextItem,
+  WireTrendingItem,
+} from "@/components/wire";
 import { HeroSlider } from "@/components/HeroSlider";
 import { articleHref, formatDuration } from "@/lib/format";
 import { IconArrowRight, IconPlay, IconTrend } from "@/components/icons";
@@ -55,6 +61,7 @@ export default async function HomePage() {
     slots,
     wirePool,
     wireCountries,
+    wireTrending,
   ] = await Promise.all([
     getTrending("week", 5),
     getCountryBlocks([...usedIds]),
@@ -68,6 +75,7 @@ export default async function HomePage() {
     // balanced across the four countries and still not overlap the others.
     getWire({ take: 90 }),
     getCountries(),
+    getWireTrending({ take: 5 }),
   ]);
 
   const [politics, business, security, culture, sports, explained] = await Promise.all([
@@ -213,8 +221,12 @@ export default async function HomePage() {
             <h2 className="section-title text-[0.92rem]">Trending Now</h2>
           </div>
           <ol className="space-y-3">
-            {trending.map((a, i) => (
-              <TrendingItem key={a.id} article={a} rank={i + 1} />
+            {/* Ranked by how many newsrooms are carrying the story. It used to
+                rank our own articles by read count, which meant it showed the
+                same three headlines for the ten days since anything was
+                filed. */}
+            {wireTrending.map(({ item, outlets }, i) => (
+              <WireTrendingItem key={item.id} item={item} rank={i + 1} outlets={outlets} />
             ))}
           </ol>
           {/* mt-auto keeps this on the bottom edge when the row is taller

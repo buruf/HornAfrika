@@ -172,6 +172,28 @@ export function stripDateline(text: string): string {
   );
 }
 
+/**
+ * Is this excerpt a broadcast round-up rather than a single story?
+ *
+ * France 24's evening bulletin arrives as one feed item whose headline is the
+ * first story and whose body runs through several unrelated ones: "In
+ * tonight's edition: a deadly landslide at a gold mine in the Central African
+ * Republic ... Meanwhile, Ethiopia is turning to Bordeaux expertise". Tagging
+ * that from the body filed a Cameroon headline under Ethiopia and, because a
+ * round-up name-checks half a continent, it then clustered with everything and
+ * reached number two on the homepage.
+ *
+ * Only one item in a 2,300-item corpus matched when this was written, but the
+ * bulletin runs daily and its whole nature is to mention many countries, so it
+ * recurs. Matching the explicit opening phrase keeps the rule to the format it
+ * was written for rather than guessing at "multi-topic" in general.
+ */
+export function isRoundUp(excerpt: string): boolean {
+  return /\bin (?:tonight|today|this morning|this evening)(?:'|’)?s? edition\b/i.test(
+    excerpt,
+  );
+}
+
 export function detectCountries(text: string): string[] {
   const hay = text.toLowerCase();
   const hits: string[] = [];
@@ -249,8 +271,14 @@ export function resolveItemCountries(
     publisherLocalOnly?: boolean;
   } = {},
 ): { slugs: string[]; inherited: boolean } {
-  const body = stripDateline(excerpt);
-  const hasExcerpt = excerpt.trim().length > 0;
+  // A broadcast round-up is several unrelated stories in one item: its
+  // headline is the first and its body runs through the others. Judging it on
+  // the body filed a Cameroon headline under Ethiopia, and because a round-up
+  // name-checks half a continent it then clustered with everything and reached
+  // number two on the homepage Trending card. For these, the headline is the
+  // only honest evidence about what the item is.
+  const body = isRoundUp(excerpt) ? "" : stripDateline(excerpt);
+  const hasExcerpt = !isRoundUp(excerpt) && excerpt.trim().length > 0;
 
   const fromBody = detectCountries(`${title} ${body}`);
   if (fromBody.length > 0) return { slugs: fromBody, inherited: false };
@@ -260,8 +288,11 @@ export function resolveItemCountries(
     return { slugs: [], inherited: false };
   }
 
-  // The dateline is now the only signal worth having.
-  const fromDateline = detectCountries(`${title} ${excerpt}`);
+  // The dateline is now the only signal worth having — but not for a
+  // round-up, whose body we have deliberately discarded.
+  const fromDateline = isRoundUp(excerpt)
+    ? []
+    : detectCountries(`${title} ${excerpt}`);
   if (fromDateline.length > 0) return { slugs: fromDateline, inherited: false };
 
   return resolveCountries(`${title} ${body}`, { ...opts, hasExcerpt });

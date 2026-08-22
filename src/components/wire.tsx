@@ -204,6 +204,130 @@ export function WireTextItem({ item }: { item: WireCardItem }) {
 }
 
 /**
+ * A wire headline in the Trending list style.
+ *
+ * Matches TrendingItem in cards.tsx — same rank pill, same clamp, same meta
+ * line — so the Trending card keeps its shape while the content underneath it
+ * becomes something that actually changes. Where an article shows its date,
+ * this shows how many newsrooms carried the story, because that is the thing
+ * being ranked.
+ */
+export function WireTrendingItem({
+  item,
+  rank,
+  outlets,
+}: {
+  item: WireCardItem;
+  rank: number;
+  outlets: number;
+}) {
+  return (
+    <li className="flex gap-3 border-b border-rule pb-3 last:border-b-0 last:pb-0">
+      <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-brand text-[0.7rem] font-extrabold text-white">
+        {rank}
+      </span>
+      <div className="min-w-0">
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hl clamp-3 text-[0.88rem] leading-[1.32]"
+        >
+          {item.title}
+          <span className="ml-1 text-[0.7rem] font-normal text-ink-mute" aria-hidden>
+            ↗
+          </span>
+        </a>
+        <p className="meta mt-1">
+          {outlets > 1 ? `${outlets} newsrooms` : item.originalPublisher ?? item.source.name}
+          <span className="mx-1.5">·</span>
+          {timeAgo(item.publishedAt)}
+        </p>
+      </div>
+    </li>
+  );
+}
+
+/**
+ * A wire headline in the StackedCard style, for the grids that used articles.
+ *
+ * Line for line the same as StackedCard in cards.tsx: same image box, same
+ * padding, same type. The category chip's slot carries the outlet instead,
+ * which is the one thing that must differ.
+ */
+export function WireStackedCard({
+  item,
+  imageHeight = "h-[168px]",
+  showExcerpt = true,
+  note,
+}: {
+  item: WireCardItem;
+  imageHeight?: string;
+  showExcerpt?: boolean;
+  note?: string;
+}) {
+  return (
+    <article className="group flex flex-col">
+      <a
+        href={item.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        tabIndex={-1}
+        aria-hidden
+        className="block overflow-hidden bg-shell"
+      >
+        <EditorialImage
+          seed={item.id}
+          category={item.topic ?? "default"}
+          src={item.imageUrl}
+          alt=""
+          detail={false}
+          className={`${imageHeight} w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]`}
+        />
+      </a>
+      <div className="pt-3">
+        <div className="mb-1.5 flex flex-wrap items-center gap-2">
+          <span className="bg-brand px-2 py-0.5 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-white">
+            {item.originalPublisher ?? item.source.name}
+          </span>
+          {item.source.stateAffiliated && <StateTag />}
+          {item.countries.map(({ country }) => (
+            <span
+              key={country.slug}
+              className="text-[0.68rem] font-bold uppercase tracking-[0.08em] text-ink-mute"
+            >
+              {country.name}
+            </span>
+          ))}
+        </div>
+        <a href={item.url} target="_blank" rel="noopener noreferrer">
+          <h3 className="hl clamp-3 text-[1.03rem]">
+            {item.title}
+            <span className="ml-1 text-[0.75rem] font-normal text-ink-mute" aria-hidden>
+              ↗
+            </span>
+          </h3>
+        </a>
+        {showExcerpt && item.excerpt && (
+          <p className="clamp-2 mt-1.5 text-[0.85rem] leading-relaxed text-ink-soft">
+            {item.excerpt}
+          </p>
+        )}
+        <p className="meta mt-2">
+          {timeAgo(item.publishedAt)}
+          {note && (
+            <>
+              <span className="mx-1.5">·</span>
+              {note}
+            </>
+          )}
+        </p>
+      </div>
+    </article>
+  );
+}
+
+/**
  * A wire headline dressed as a hero slide.
  *
  * Deliberately identical to HeroCard in cards.tsx — same gradient, same type

@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { cache } from "react";
 import type { Prisma } from "@prisma/client";
+import { clusterStories } from "@/lib/clustering";
 
 export const wireSelect = {
   id: true,
@@ -327,3 +328,33 @@ export const getWireFreshness = cache(async () => {
   ]);
   return { lastFetchedAt: latest?.fetchedAt ?? null, total, sources };
 });
+
+/**
+ * The wire's trending list: the stories the most newsrooms are covering.
+ *
+ * "Trending" ranked our own articles by read count, and with nothing filed
+ * since 12 August it showed the same three headlines for ten days under a
+ * heading promising something measured and current. We do not track outbound
+ * clicks, so readership is not a number we honestly have for the wire — but
+ * how many separate newsrooms carried a story is, and on an aggregator that is
+ * the better signal anyway.
+ *
+ * The window matters: over too long a period everything accumulates coverage
+ * and the ranking stops moving, which is the failure being fixed.
+ */
+export async function getWireTrending(
+  { hours = 48, take = 12 }: { hours?: number; take?: number } = {},
+) {
+  const items = await db.wireItem.findMany({
+    where: {
+      ...wireWhere({}),
+      publishedAt: { gte: new Date(Date.now() - hours * 3_600_000) },
+    },
+    orderBy: { publishedAt: "desc" },
+    select: wireSelect,
+  });
+
+  return clusterStories(items)
+    .slice(0, take)
+    .map((c) => ({ item: c.lead, outlets: c.outlets }));
+}

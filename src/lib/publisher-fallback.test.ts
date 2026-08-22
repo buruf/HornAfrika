@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveCountries } from "./country-tagger";
+import { isRoundUp, resolveCountries, resolveItemCountries } from "./country-tagger";
 import { mentionsElsewhere } from "./elsewhere";
 
 /**
@@ -132,5 +132,38 @@ describe("mentionsElsewhere", () => {
     expect(mentionsElsewhere("a romantic evening")).toBe(false);
     expect(mentionsElsewhere("malignant growth")).toBe(false);
     expect(mentionsElsewhere("Chadic languages")).toBe(false);
+  });
+});
+
+describe("broadcast round-ups", () => {
+  /**
+   * France 24's evening bulletin is one feed item covering several unrelated
+   * stories. Its headline was about Cameroon and its body mentioned Ethiopia,
+   * so it was filed under Ethiopia and — because a round-up name-checks half a
+   * continent — clustered with everything and reached number two on the
+   * homepage Trending card.
+   */
+  const bulletin =
+    "In tonight’s edition: a deadly landslide at a gold mine in the Central African Republic leaves dozens dead, with victims from Cameroon and Chad. Meanwhile, Ethiopia is turning to Bordeaux expertise to grow its wine industry.";
+
+  it("ignores the body of a round-up and judges it on the headline", () => {
+    const r = resolveItemCountries(
+      "Search continues after deadly mine collapse on Cameroon border",
+      bulletin,
+    );
+    expect(r.slugs).toEqual([]);
+  });
+
+  it("still tags a round-up whose own headline is about the Horn", () => {
+    const title = "Ethiopia turns to Bordeaux to grow its wine industry";
+    const r = resolveItemCountries(title, bulletin);
+    expect(r.slugs).toEqual(["ethiopia"]);
+  });
+
+  it("leaves ordinary items alone", () => {
+    const title = "Drought deepens in Gedo";
+    const excerpt = "Families in Gedo are walking further for water this season.";
+    const r = resolveItemCountries(title, excerpt);
+    expect(r.slugs).toEqual(["somalia"]);
   });
 });
