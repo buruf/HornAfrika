@@ -1,3 +1,20 @@
+/**
+ * An ISO instant for metadata and structured data, or undefined.
+ *
+ * The rest of this file already accepts `Date | string` because cached rows
+ * arrive as strings; this is the same tolerance for the machine-readable
+ * dates. Returning undefined rather than throwing matters here: these values
+ * go into og: tags and JSON-LD, where a missing property costs a little SEO
+ * and a thrown one costs the whole page. The article route used to call
+ * `publishedAt?.toISOString()` directly, which guarded null but not string,
+ * and 500'd every article on its second view.
+ */
+export function toIso(d: Date | string | null | undefined): string | undefined {
+  if (!d) return undefined;
+  const date = typeof d === "string" ? new Date(d) : d;
+  return Number.isNaN(date.valueOf()) ? undefined : date.toISOString();
+}
+
 export function formatDate(d: Date | string | null | undefined) {
   if (!d) return "";
   const date = typeof d === "string" ? new Date(d) : d;

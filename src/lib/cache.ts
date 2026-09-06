@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache";
+import { reviveDates } from "@/lib/revive-dates";
 
 /**
  * Data caching.
@@ -40,6 +41,13 @@ export type CacheTag = (typeof TAGS)[keyof typeof TAGS];
  *
  * Arguments are part of the cache key, so `getByCountry("somalia", …)` and
  * `getByCountry("ethiopia", …)` do not collide.
+ *
+ * Results are passed through `reviveDates` on the way out. unstable_cache
+ * serialises to JSON, so on a cache hit every Date has become a string while
+ * on a miss it is still a Date — a difference no caller can see until it calls
+ * a Date method and throws. That has caused three separate bugs, most recently
+ * every article page 500ing on its second view. Reviving here means a cached
+ * query returns what the uncached one would.
  */
 export function cached<A extends unknown[], R>(
   fn: (...args: A) => Promise<R>,
@@ -50,7 +58,7 @@ export function cached<A extends unknown[], R>(
     unstable_cache(() => fn(...args), [keyPrefix, JSON.stringify(args)], {
       tags: opts.tags,
       revalidate: opts.revalidate,
-    })();
+    })().then(reviveDates);
 }
 
 /**

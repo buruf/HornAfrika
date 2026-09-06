@@ -13,7 +13,7 @@ import { SectionHead } from "@/components/SectionHead";
 import { RowCard, StackedCard, TrendingItem } from "@/components/cards";
 import { AdSlot } from "@/components/AdSlot";
 import { NewsletterForm } from "@/components/NewsletterForm";
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate, formatDateTime, toIso } from "@/lib/format";
 import { SITE } from "@/lib/site";
 
 import type { Locale } from "@prisma/client";
@@ -60,8 +60,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
       title: a.headline,
       description: a.deck,
       url: canonical,
-      publishedTime: a.publishedAt?.toISOString(),
-      modifiedTime: (a.revisedAt ?? a.updatedAt).toISOString(),
+      publishedTime: toIso(a.publishedAt),
+      modifiedTime: toIso(a.revisedAt ?? a.updatedAt),
       authors: [a.author.name],
       section: a.category.name,
       images: [{ url: `${SITE.url}/api/og/${a.slug}`, width: 1200, height: 675 }],
@@ -123,8 +123,8 @@ export default async function ArticlePage({ params, searchParams }: Params) {
     "@type": "NewsArticle",
     headline: a.headline,
     description: a.deck,
-    datePublished: a.publishedAt?.toISOString(),
-    dateModified: (a.revisedAt ?? a.updatedAt).toISOString(),
+    datePublished: toIso(a.publishedAt),
+    dateModified: toIso(a.revisedAt ?? a.updatedAt),
     // A desk byline is an Organization. Emitting Person for it would publish
     // structured data asserting a journalist exists when none does.
     author: a.author.isDesk
