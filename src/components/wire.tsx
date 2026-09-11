@@ -39,6 +39,49 @@ function Credit({ item, className = "" }: { item: WireCardItem; className?: stri
   );
 }
 
+const LANGUAGE_LABEL: Record<string, string> = {
+  so: "Somali",
+  fr: "French",
+  am: "Amharic",
+  ar: "Arabic",
+  ti: "Tigrinya",
+};
+
+/**
+ * Says what language a headline is in, when it is not English.
+ *
+ * The site is written in English and about a third of the wire is not: Somali
+ * outlets are the most prolific we can reach, and Caasimada, Kaab TV and
+ * Horseed all file in Somali. Only WireLink said so, which meant eight of the
+ * nine wire presentations showed a reader untranslated Somali text with
+ * nothing to explain it — and made a page that is balanced by country read as
+ * a Somali site.
+ *
+ * Labelling is not a fix for the balance itself. It is the minimum owed to a
+ * reader who cannot read the headline: tell them why.
+ */
+function LangTag({ item }: { item: WireCardItem }) {
+  if (item.source.language === "en") return null;
+  return (
+    <span
+      className="border border-rule px-1 py-px text-[0.56rem] font-bold uppercase tracking-[0.06em] text-ink-mute"
+      title={`Headline in ${LANGUAGE_LABEL[item.source.language] ?? item.source.language}`}
+    >
+      {LANGUAGE_LABEL[item.source.language] ?? item.source.language}
+    </span>
+  );
+}
+
+/** Same, for dark overlays where the muted border disappears. */
+function LangTagLight({ item }: { item: WireCardItem }) {
+  if (item.source.language === "en") return null;
+  return (
+    <span className="border border-white/40 px-1 py-px text-[0.56rem] font-bold uppercase tracking-[0.06em] text-white/85">
+      {LANGUAGE_LABEL[item.source.language] ?? item.source.language}
+    </span>
+  );
+}
+
 const KIND_LABEL: Record<string, string> = {
   REGIONAL: "Regional",
   HORN: "Horn",
@@ -76,11 +119,7 @@ export function WireLink({
           className="text-[0.7rem] font-extrabold uppercase tracking-[0.07em] text-ink"
         />
         {item.source.stateAffiliated && <StateTag />}
-        {item.source.language !== "en" && (
-          <span className="text-[0.62rem] font-bold uppercase tracking-[0.06em] text-ink-mute">
-            {item.source.language === "so" ? "Somali" : item.source.language === "fr" ? "French" : item.source.language}
-          </span>
-        )}
+        <LangTag item={item} />
         <span className="meta">{timeAgo(item.publishedAt)}</span>
       </div>
 
@@ -123,6 +162,7 @@ export function WireRow({ item }: { item: WireCardItem }) {
         <span className="border border-rule px-1.5 py-px text-[0.6rem] font-bold uppercase tracking-[0.06em] text-ink-mute">
           {KIND_LABEL[item.source.kind] ?? item.source.kind}
         </span>
+        <LangTag item={item} />
         {item.source.stateAffiliated && <StateTag />}
         {item.author && (
           <span className="text-[0.74rem] text-ink-mute">{item.author}</span>
@@ -189,6 +229,7 @@ export function WireTextItem({ item }: { item: WireCardItem }) {
           className="text-[0.68rem] font-extrabold uppercase tracking-[0.08em] text-brand"
         />
         {item.source.stateAffiliated && <StateTag />}
+        <LangTag item={item} />
         <span className="meta ml-auto">{timeAgo(item.publishedAt)}</span>
       </div>
       <a href={item.url} target="_blank" rel="noopener noreferrer">
@@ -238,7 +279,8 @@ export function WireTrendingItem({
             ↗
           </span>
         </a>
-        <p className="meta mt-1">
+        <p className="meta mt-1 flex flex-wrap items-center gap-1.5">
+          <LangTag item={item} />
           {outlets > 1 ? `${outlets} newsrooms` : item.originalPublisher ?? item.source.name}
           <span className="mx-1.5">·</span>
           {timeAgo(item.publishedAt)}
@@ -290,6 +332,7 @@ export function WireStackedCard({
           <span className="bg-brand px-2 py-0.5 text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-white">
             {item.originalPublisher ?? item.source.name}
           </span>
+          <LangTag item={item} />
           {item.source.stateAffiliated && <StateTag />}
           {item.countries.map(({ country }) => (
             <span
@@ -374,6 +417,7 @@ export function WireOverlayCard({
           <span className="bg-brand px-2 py-0.5 text-[0.6rem] font-extrabold uppercase tracking-[0.07em] text-white">
             {item.originalPublisher ?? item.source.name}
           </span>
+          <LangTagLight item={item} />
           <h3 className="clamp-2 mt-2 text-[0.98rem] font-extrabold leading-[1.22] text-white">
             {item.title}
             <span className="ml-1 text-[0.72rem] font-normal text-white/70" aria-hidden>
@@ -408,11 +452,12 @@ export function WireRowCard({ item }: { item: WireCardItem }) {
         />
       </a>
       <div className="min-w-0">
-        <div className="mb-1 flex items-center gap-2">
+        <div className="mb-1 flex flex-wrap items-center gap-2">
           <Credit
             item={item}
             className="text-[0.62rem] font-extrabold uppercase tracking-[0.07em] text-brand"
           />
+          <LangTag item={item} />
         </div>
         <a href={item.url} target="_blank" rel="noopener noreferrer">
           <h3 className="hl clamp-2 text-[0.92rem]">
@@ -441,6 +486,11 @@ export function WireBulletItem({ item }: { item: WireCardItem }) {
         rel="noopener noreferrer"
         className="hl clamp-2 text-[0.87rem] leading-[1.4]"
       >
+        {item.source.language !== "en" && (
+          <span className="mr-1.5 text-[0.56rem] font-bold uppercase tracking-[0.06em] text-ink-mute">
+            {LANGUAGE_LABEL[item.source.language] ?? item.source.language}
+          </span>
+        )}
         {item.title}
         <span className="ml-1 text-[0.68rem] font-normal text-ink-mute" aria-hidden>
           ↗
@@ -487,6 +537,7 @@ export function WireHeroSlide({ item }: { item: WireCardItem }) {
             <span className="bg-brand px-2 py-1 text-[0.62rem] font-extrabold uppercase tracking-[0.08em] text-white">
               {item.originalPublisher ?? item.source.name}
             </span>
+            <LangTagLight item={item} />
             {item.source.stateAffiliated && <StateTag />}
             {item.countries.map(({ country }) => (
               <span
